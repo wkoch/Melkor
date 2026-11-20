@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mount -t proc -o nosuid,nodev,noexec proc /proc
+mount -t sysfs -o nosuid,nodev,noexec sysfs /sys
+mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /run
+mkdir -p /dev/pts
+mount -t devpts -o nosuid,noexec devpts /dev/pts
+hostname melkor

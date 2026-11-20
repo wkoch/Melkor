@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_MELKOR_PATH/package/dinit/Config.in"

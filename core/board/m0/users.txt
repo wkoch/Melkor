@@ -1,0 +1,2 @@
+# Conta de console da VM. A senha de teste é melkor.
+melkor 1000 melkor 1000 $6$melkor-m0$470inhuImxeGkBZsEUsOmIqxhecSlisW3pouUdfsuzuNwZ3fbxG.irLrNFnfKfOY2k877tmIm/TFAk5g.54BK1 /home/melkor /bin/sh - Console-M0

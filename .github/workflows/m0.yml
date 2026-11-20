@@ -1,0 +1,45 @@
+name: Melkor M0
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  boot-uefi:
+    name: Build e boot UEFI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Instalar ferramentas do host
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            bc binutils bison build-essential ca-certificates cpio diffutils file flex \
+            gawk git gzip libncurses-dev m4 make patch perl python3 rsync tar unzip \
+            wget xz-utils qemu-system-x86 ovmf
+      - name: Construir a imagem
+        run: make image
+      - name: Fazer login em QEMU com OVMF
+        env:
+          QEMU_ACCEL: tcg
+        run: make test-boot
+      - name: Guardar evidências
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: melkor-m0-evidencias
+          path: |
+            out/m0/build.log
+            out/m0/packages.json
+            out/m0/toolchain.txt
+            out/m0/SHA256SUMS
+            out/m0/tests/*/result.json
+            out/m0/tests/*/serial.log

@@ -1,0 +1,3 @@
+type = scripted
+command = /usr/libexec/melkor-setup
+options = starts-on-console

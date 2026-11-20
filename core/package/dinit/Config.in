@@ -1,0 +1,8 @@
+config BR2_PACKAGE_DINIT
+	bool "dinit"
+	depends on BR2_INSTALL_LIBSTDCPP
+	depends on BR2_USE_MMU
+	help
+	  Service supervisor and system init written in C++.
+
+	  https://davmac.org/projects/dinit/
