@@ -27,8 +27,7 @@ bundle = script("bundle-m1")
 
 LOGIN = b"\rmelkor login: \n\rPassword: \nmelkor$ \n"
 PROBE = b"M0-ID=melkor\nM0-PID1=dinit\nM0-LOGIN=melkor\nM0-UEFI=yes\nM0-ROOT=squashfs,ro\nM0-END\n"
-MENU = (b"Melkor Linux M1 - slot B\n"
-        b"The highlighted entry will be executed automatically in 3s.\n")
+MENU = b"Melkor Linux M1 - slot B\nPress enter to boot the selected OS\n*Melkor Linux M1 - slot A\n"
 
 
 class BundleTest(unittest.TestCase):
@@ -115,10 +114,14 @@ class SerialTest(unittest.TestCase):
     def test_slot_b_selecionado_e_documento_reaberto(self):
         persist = (b"\nM1-VERSION=m1\nM1-SLOT=rauc.slot=B\nM1-DATA=rw,nosuid\n"
                    b"M1-DOCUMENT=melkor-m1-persistencia\nM1-END\n")
-        with console(MENU + b"*Melkor Linux M1 - slot B\n" + LOGIN + PROBE + persist) as process:
+        for timer in (b"", b"The highlighted entry will be executed automatically in 3s.\n"):
+            with console(MENU + timer + b"*Melkor Linux M1 - slot B\n" + LOGIN + PROBE + persist) as process:
+                boot.check_console(process, io.BytesIO(), timeout=1, slot="B")
+                self.assertTrue(process.stdin.getvalue().startswith(b"\x1b[B\rmelkor\r"))
+                self.assertNotIn(boot.WRITE_DOCUMENT.encode(), process.stdin.getvalue())
+        with console(b"*Melkor Linux M1 - slot B\n" + LOGIN + PROBE + persist) as process:
             boot.check_console(process, io.BytesIO(), timeout=1, slot="B")
-            self.assertTrue(process.stdin.getvalue().startswith(b"\x1b[B\rmelkor\r"))
-            self.assertNotIn(boot.WRITE_DOCUMENT.encode(), process.stdin.getvalue())
+            self.assertTrue(process.stdin.getvalue().startswith(b"\rmelkor\r"))
 
     def test_slot_b_exige_confirmacao_antes_de_enviar_enter(self):
         with console(MENU + b"Booting `Melkor Linux M1 - slot A'\n") as process:

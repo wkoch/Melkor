@@ -74,6 +74,22 @@ Em 20 de novembro de 2026, o M1 ganhou Quad9 via DoH como resolvedor padrão. A 
 
 O SHA-256 da imagem candidata é `10a34a9ff185e6c04a0714c05b5dfd24c3b19ba8b77f413dda1f9020c55f6349`. A validação usou cópias em QEMU com KVM e OVMF. Wi-Fi, navegadores e contêineres de aplicativos entram nos testes de instalação e sessão.
 
+### Primeira prévia para QEMU
+
+A versão `v0.1.0-alpha.1` publica o disco M1 comprimido e o CLI de aplicativos estático para o host Linux x86-64. O manifesto vincula os artefatos ao commit `fcb32e6bf1e0574f9345f20e942ca3d3d36a510f`. A conta root está bloqueada e a imagem vem sem chaveiro do RAUC. O login serial de laboratório usa `melkor` como usuário e senha. [Release e instruções de teste](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
+
+| Comando | Pré-requisito e resultado |
+| --- | --- |
+| `make check-env BOARD=m1` | O cache e as ferramentas do contêiner Fedora 45 passaram na verificação offline. |
+| `MELKOR_RAUC_KEYRING= MELKOR_LAB_ROOT_HASH_FILE= make image BOARD=m1 OUT=out/v0.1.0-alpha.1-build` | Build completo a partir do cache verificado, em uma pasta nova e sem credenciais nem chaveiro do laboratório. |
+| `make check-m1 OUT=out/v0.1.0-alpha.1-build` | A GPT, os slots e a configuração DoH passaram. Uma inspeção com `grub-fstest` confirmou o bloqueio de root e a ausência do runtime Python e do chaveiro em ambos os slots. |
+| `make test-boot BOARD=m1 OUT=out/v0.1.0-alpha.1-build` | Com QEMU, OVMF e KVM, o teste confirmou login nos dois slots e reabriu o documento gravado em A. O teste atualizado também passou com `QEMU_ACCEL=tcg`. |
+| `make test-dns OUT=out/v0.1.0-alpha.1-build` e o mesmo comando com `DNS_IPV6_ONLY=1` | Em QEMU, com OVMF, `tcpdump` e acesso ao Quad9 nas duas famílias, o TXT confirmou DoH. Após interromper a saída HTTPS da VM, as consultas falharam sem cair para DNS aberto. |
+| `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | A suíte com Go, coverage.py e kcov registrou 86,7% em Go, 95,7% em Python e 96,0% em Shell no commit da prévia. Após o ajuste do teste de boot, Python ficou em 95,3%. |
+| `gzip -n -6` e `sha256sum -c SHA256SUMS` | O disco comprimido foi conferido após baixar os artefatos do GitHub. O comando QEMU das instruções da release chegou ao login usando o disco distribuído. |
+
+O SHA-256 do disco descomprimido é `2107eeaf9660b402247012cba8f0379d840df151ac6da565eb953a1f316d19fb`. No GitHub Actions, o runner de M1 da revisão publicada esgotou o disco durante o build. A cobertura e o boot de M0 passaram nessa execução. O workflow seguinte libera espaço retirando os SDKs de Android e .NET do runner hospedado de M1. [Execução da revisão publicada](https://github.com/wkoch/Melkor/actions/runs/44828807728)
+
 ## M2 — Desktop Wayland utilizável
 
 Integrar a toolchain pretendida, utilitários selecionados, sessão dinit, Mesa, áudio e portais. Fixar versões compatíveis de Umbriel e wlroots. Validar Noctalia, Luciole e Alacritty em musl. Testar ABNT2, acentos, clipboard, bloqueio e recuperação de sessão. Estender o teste de saúde da candidata para detectar uma falha que impeça o login gráfico. Produzir o inventário dos runtimes observados.

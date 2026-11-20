@@ -37,6 +37,12 @@ jobs:
       matrix:
         board: [m0, m1]
     steps:
+      - name: Liberar espaço para o Buildroot M1
+        if: matrix.board == 'm1' && runner.environment == 'github-hosted'
+        run: |
+          df -h .
+          sudo rm -rf -- /usr/local/lib/android/sdk /usr/share/dotnet
+          df -h .
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

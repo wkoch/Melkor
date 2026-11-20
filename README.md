@@ -4,6 +4,10 @@ Melkor é a distribuição Linux pessoal de William Koch. Sua estação de traba
 
 O marco M0 entrega uma imagem x86-64 que inicia por UEFI e chega ao console serial em QEMU. Os marcos seguintes cobrem recuperação A/B, desktop Wayland e aplicativos.
 
+## Testar a primeira prévia
+
+Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot serial. A prévia inclui dinit, slots A/B, armazenamento persistente e DNS do sistema via Quad9 DoH. A release também oferece o CLI de aplicativos para o host Linux x86-64. A instalação em computador físico faz parte do M4. [Melkor v0.1.0-alpha.1](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
+
 ## A experiência pretendida
 
 - **Alterar o core.** Editar a receita, recompilar o conjunto completo a partir das fontes e testar a imagem. Ativar a imagem como uma nova geração, mantendo a anterior inicializável.

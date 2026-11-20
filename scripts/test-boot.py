@@ -73,15 +73,20 @@ def serial_console(process, log, timeout):
     with selectors.DefaultSelector() as serial:
         serial.register(process.stdout, selectors.EVENT_READ)
 
-        def expect(pattern, stage):
+        def expect(pattern, stage, *, wait=None):
             nonlocal pending
+            limit = deadline if wait is None else min(deadline, time.monotonic() + wait)
             match = re.search(pattern, pending, re.MULTILINE)
             while not match:
-                remaining = deadline - time.monotonic()
+                remaining = limit - time.monotonic()
                 if remaining <= 0 or not serial.select(remaining):
+                    if wait is not None:
+                        return None
                     raise RuntimeError(f"Prazo de {timeout}s excedido ao aguardar {stage}.")
                 chunk = os.read(process.stdout.fileno(), 65536)
                 if not chunk:
+                    if wait is not None:
+                        return None
                     raise RuntimeError(f"Console serial fechado durante {stage}.")
                 log.write(chunk)
                 log.flush()
@@ -109,13 +114,16 @@ def login(console, user, password, prompt):
 def check_console(process, log, timeout, slot=None):
     with serial_console(process, log, timeout) as console:
         if slot == "B":
-            # O nome do slot aparece antes de o menu terminar de desenhar.
-            console.expect(rb"The highlighted entry will be executed automatically in", "menu de slots do GRUB")
-            console.send(b"\x1b[B", end=b"")
-            selection = console.expect(rb"\*Melkor Linux M1 - slot B|Booting `Melkor Linux M1 - slot A'",
-                                       "seleção do slot B no GRUB")
-            if not selection.endswith(b"*Melkor Linux M1 - slot B"):
-                raise RuntimeError("O GRUB iniciou o slot A antes de confirmar a seleção de B.")
+            selection = console.expect(rb"\*Melkor Linux M1 - slot [AB]", "menu de slots do GRUB")
+            # A primeira marca aparece durante o desenho. Aguarde a contagem quando existir.
+            console.expect(rb"The highlighted entry will be executed automatically in",
+                           "contagem opcional do GRUB", wait=1)
+            if selection.endswith(b"*Melkor Linux M1 - slot A"):
+                console.send(b"\x1b[B", end=b"")
+                selection = console.expect(rb"\*Melkor Linux M1 - slot B|Booting `Melkor Linux M1 - slot A'",
+                                           "seleção do slot B no GRUB")
+                if not selection.endswith(b"*Melkor Linux M1 - slot B"):
+                    raise RuntimeError("O GRUB iniciou o slot A antes de confirmar a seleção de B.")
             console.send(b"")
 
         login(console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
