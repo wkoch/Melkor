@@ -3,11 +3,20 @@ set -euo pipefail
 
 buildroot_release=2025.02.20
 buildroot_commit=2f9129e7909bff6d78ae8cfda3d0e73503dfcac6
-buildroot_url=https://gitlab.com/buildroot.org/buildroot.git
+buildroot_remote=https://gitlab.com/buildroot.org/buildroot.git
 
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 output=$(realpath -m -- "${1:-out/m0}")
 cache="$project/out/dl"
+# Sem rede, use o bundle criado por scripts/prepare-env.sh. MELKOR_BUILDROOT_URL substitui a origem.
+buildroot_bundle="$project/out/cache/buildroot-$buildroot_release.bundle"
+if [[ -n "${MELKOR_BUILDROOT_URL:-}" ]]; then
+    buildroot_url=$MELKOR_BUILDROOT_URL
+elif [[ -f "$buildroot_bundle" ]]; then
+    buildroot_url=$buildroot_bundle
+else
+    buildroot_url=$buildroot_remote
+fi
 
 case "$output" in
     "$cache"|"$cache"/*|"$project"/out) echo "Escolha uma pasta de saída distinta do cache: $output" >&2; exit 2 ;;

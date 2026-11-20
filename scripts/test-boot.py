@@ -17,6 +17,8 @@ import time
 
 
 OVMF_DIRS = (Path("/usr/share/edk2/ovmf"), Path("/usr/share/OVMF"))
+# Evita binários de montagens temporárias que aparecem no PATH do host.
+SYSTEM_PATH = "/usr/bin:/usr/local/bin"
 OVMF_NAMES = (("OVMF_CODE_4M.fd", "OVMF_VARS_4M.fd"), ("OVMF_CODE.fd", "OVMF_VARS.fd"))
 
 PROBE = (
@@ -78,9 +80,10 @@ def check_console(process, log, timeout):
             process.stdin.write(line + b"\r")
             process.stdin.flush()
 
-        expect(rb"^melkor login: ?", "prompt de login")
+        # O console envia "\n\r" antes do prompt; o \r inicial não pode impedir a âncora ^.
+        expect(rb"^\r?melkor login: ?", "prompt de login")
         send(b"melkor")
-        expect(rb"^Password: ?", "prompt de senha")
+        expect(rb"^\r?Password: ?", "prompt de senha")
         send(b"melkor")
         expect(rb"^[^\n]*\$ ", "shell do usuário melkor")
         send(PROBE.encode("ascii"))
@@ -102,7 +105,7 @@ def run(args, report_dir, report):
         raise RuntimeError(f"Imagem de disco virtual ausente: {image}. Execute make image.")
     report.update(image=str(image), image_sha256=file_digest(image))
 
-    qemu = shutil.which("qemu-system-x86_64")
+    qemu = os.environ.get("QEMU_SYSTEM") or shutil.which("qemu-system-x86_64", path=SYSTEM_PATH)
     if qemu is None:
         raise RuntimeError("Instale qemu-system-x86_64 para executar o teste.")
     code, variables = find_firmware(args)
