@@ -1,0 +1,9 @@
+config BR2_PACKAGE_DNSPROXY
+	bool "dnsproxy"
+	depends on BR2_PACKAGE_HOST_GO_TARGET_ARCH_SUPPORTS
+	depends on BR2_PACKAGE_HOST_GO_HOST_ARCH_SUPPORTS
+	select BR2_PACKAGE_CA_CERTIFICATES
+	help
+	  Forward DNS queries from loopback using Quad9 over HTTPS.
+
+	  https://github.com/AdguardTeam/dnsproxy

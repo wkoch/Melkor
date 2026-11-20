@@ -1,0 +1,4 @@
+type = process
+command = /sbin/dhcpcd -B -f /etc/dhcpcd.conf
+depends-on = network-local
+restart = true

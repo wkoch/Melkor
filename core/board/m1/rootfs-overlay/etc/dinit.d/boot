@@ -1,0 +1,5 @@
+type = internal
+depends-on = serial-console
+waits-for = rauc-confirm
+waits-for = network-link
+waits-for = dns

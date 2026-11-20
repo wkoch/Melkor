@@ -1,0 +1,18 @@
+{
+  "listen-addrs": [
+    "127.0.0.1",
+    "::1"
+  ],
+  "listen-ports": [
+    53
+  ],
+  "timeout": "3s",
+  "max-go-routines": 128,
+  "upstream-mode": "load_balance",
+  "upstream": [
+    "sdns://AgMAAAAAAAAACzkuOS45Ljk6NDQzAA1kbnMucXVhZDkubmV0Ci9kbnMtcXVlcnk",
+    "sdns://AgMAAAAAAAAAEzE0OS4xMTIuMTEyLjExMjo0NDMADWRucy5xdWFkOS5uZXQKL2Rucy1xdWVyeQ",
+    "sdns://AgMAAAAAAAAAEVsyNjIwOmZlOjpmZV06NDQzAA1kbnMucXVhZDkubmV0Ci9kbnMtcXVlcnk",
+    "sdns://AgMAAAAAAAAAEFsyNjIwOmZlOjo5XTo0NDMADWRucy5xdWFkOS5uZXQKL2Rucy1xdWVyeQ"
+  ]
+}

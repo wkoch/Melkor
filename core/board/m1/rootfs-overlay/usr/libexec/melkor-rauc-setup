@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+find_partition() {
+    device=$(blkid -o device -t "PARTUUID=$1") || return
+    test -b "$device" || return
+    printf '%s\n' "$device"
+}
+
+esp=$(find_partition 9327fc8b-81c1-4a28-85d1-926f223636f7)
+core_a=$(find_partition 5ec75b1f-b914-4890-b5c9-da50d53bf535)
+core_b=$(find_partition 0c7a09b8-0232-493b-a079-e966c61f06f0)
+
+install -d -m 0700 /run/melkor /run/melkor/esp /run/rauc /persist/rauc
+ln -sf "$core_a" /run/melkor/core-a
+ln -sf "$core_b" /run/melkor/core-b
+mount -t vfat -o rw,nosuid,nodev,noexec,fmask=0177,dmask=0077 "$esp" /run/melkor/esp

@@ -1,0 +1,4 @@
+type = scripted
+command = /usr/bin/flock /run/melkor/rauc.lock /usr/bin/rauc status mark-good
+depends-on = rauc-setup
+depends-on = serial-console

@@ -1,0 +1,3 @@
+type = scripted
+command = /usr/libexec/melkor-rauc-setup
+depends-on = persist

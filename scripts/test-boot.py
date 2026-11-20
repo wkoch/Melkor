@@ -2,6 +2,7 @@
 """Faz login no console de uma VM UEFI e registra os resultados no host."""
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 
 
 OVMF_DIRS = (Path("/usr/share/edk2/ovmf"), Path("/usr/share/OVMF"))
@@ -29,6 +31,17 @@ PROBE = (
     'printf "M0-ROOT="; awk \'$2 == "/" {print $3 "," $4; exit}\' /proc/mounts; '
     '[ -d /sys/firmware/efi ] && printf "M0-UEFI=yes\\n"; '
     'printf "M0-END\\n"'
+)
+PERSIST_PROBE = (
+    '. /etc/os-release; printf "\\nM1-VERSION=%s\\n" "$VERSION_ID"; '
+    'printf "M1-SLOT="; awk \'{for (i=1; i<=NF; i++) if ($i ~ /^rauc[.]slot=/) print $i}\' /proc/cmdline; '
+    'printf "M1-DATA="; awk \'$2 == "/persist" && $3 == "ext4" {print $4; exit}\' /proc/mounts; '
+    'printf "M1-DOCUMENT="; cat "$HOME/.melkor-m1-probe"; '
+    'printf "\\nM1-END\\n"'
+)
+WRITE_DOCUMENT = (
+    'printf "melkor-m1-persistencia\\n" > "$HOME/.melkor-m1-probe" && sync '
+    '&& printf "\\nM1-SYNC=ok\\n"; '
 )
 
 
@@ -52,7 +65,8 @@ def find_firmware(args):
     raise RuntimeError("Firmware OVMF ausente. Informe OVMF_CODE e OVMF_VARS em formato raw.")
 
 
-def check_console(process, log, timeout):
+@contextmanager
+def serial_console(process, log, timeout):
     deadline = time.monotonic() + timeout
     pending = b""
 
@@ -76,18 +90,41 @@ def check_console(process, log, timeout):
             received, pending = pending[:match.end()], pending[match.end():]
             return received.replace(b"\r", b"")
 
-        def send(line):
-            process.stdin.write(line + b"\r")
+        def send(line, end=b"\r"):
+            process.stdin.write(line + end)
             process.stdin.flush()
 
-        # O console envia "\n\r" antes do prompt; o \r inicial não pode impedir a âncora ^.
-        expect(rb"^\r?melkor login: ?", "prompt de login")
-        send(b"melkor")
-        expect(rb"^\r?Password: ?", "prompt de senha")
-        send(b"melkor")
-        expect(rb"^[^\n]*\$ ", "shell do usuário melkor")
-        send(PROBE.encode("ascii"))
-        result = expect(rb"^M0-END\r?$", "resposta das verificações")
+        yield SimpleNamespace(expect=expect, send=send)
+
+
+def login(console, user, password, prompt):
+    # O console envia "\n\r" antes do prompt.
+    console.expect(rb"^\r?melkor login: ?", "prompt de login")
+    console.send(user)
+    console.expect(rb"^\r?Password: ?", "prompt de senha")
+    console.send(password)
+    console.expect(prompt, "shell do convidado")
+
+
+def check_console(process, log, timeout, slot=None):
+    with serial_console(process, log, timeout) as console:
+        if slot == "B":
+            # O nome do slot aparece antes de o menu terminar de desenhar.
+            console.expect(rb"The highlighted entry will be executed automatically in", "menu de slots do GRUB")
+            console.send(b"\x1b[B", end=b"")
+            selection = console.expect(rb"\*Melkor Linux M1 - slot B|Booting `Melkor Linux M1 - slot A'",
+                                       "seleção do slot B no GRUB")
+            if not selection.endswith(b"*Melkor Linux M1 - slot B"):
+                raise RuntimeError("O GRUB iniciou o slot A antes de confirmar a seleção de B.")
+            console.send(b"")
+
+        login(console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
+        console.send(PROBE.encode("ascii"))
+        result = console.expect(rb"^M0-END\r?$", "resposta das verificações")
+        if slot:
+            probe = (WRITE_DOCUMENT if slot == "A" else "") + PERSIST_PROBE
+            console.send(probe.encode("ascii"))
+            persistent = console.expect(rb"^M1-END\r?$", "verificação de persistência do M1")
 
     lines = result.splitlines()
     for expected in (b"M0-ID=melkor", b"M0-PID1=dinit", b"M0-LOGIN=melkor", b"M0-UEFI=yes"):
@@ -97,6 +134,18 @@ def check_console(process, log, timeout):
     root = re.search(rb"^M0-ROOT=squashfs,([^\n]+)$", result, re.MULTILINE)
     if root is None or b"ro" not in root[1].split(b","):
         raise RuntimeError("A raiz do convidado precisa estar em SquashFS, montada somente para leitura.")
+
+    if slot:
+        expected = [b"M1-VERSION=m1", f"M1-SLOT=rauc.slot={slot}".encode("ascii"),
+                    b"M1-DOCUMENT=melkor-m1-persistencia"]
+        if slot == "A":
+            expected.append(b"M1-SYNC=ok")
+        for field in expected:
+            if field not in persistent.splitlines():
+                raise RuntimeError(f"Verificação do slot {slot} falhou: {field.decode('ascii')}.")
+        data = re.search(rb"^M1-DATA=([^\n]+)$", persistent, re.MULTILINE)
+        if data is None or b"rw" not in data[1].split(b","):
+            raise RuntimeError("A partição ext4 de dados precisa estar montada para escrita.")
 
 
 def run(args, report_dir, report):
@@ -111,6 +160,10 @@ def run(args, report_dir, report):
     code, variables = find_firmware(args)
     variables_copy = report_dir / "OVMF_VARS.fd"
     shutil.copyfile(variables, variables_copy)
+    disk = image
+    if args.ab:
+        disk = report_dir / "disk.img"
+        shutil.copyfile(image, disk)
 
     accel = args.accel
     if accel == "auto":
@@ -124,26 +177,31 @@ def run(args, report_dir, report):
                "-serial", "stdio", "-monitor", "none", "-nic", "none", "-no-reboot",
                "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
                "-drive", drive(variables_copy, "if=pflash,unit=1"),
-               "-drive", drive(image, "if=none,id=melkor,snapshot=on"),
+               "-drive", drive(disk, "if=none,id=melkor" if args.ab else "if=none,id=melkor,readonly=on"),
                "-device", "virtio-blk-pci,drive=melkor,bootindex=1"]
 
     report.update(accel=accel, timeout_seconds=timeout, command=shlex.join(command),
                   ovmf_code_sha256=file_digest(code), ovmf_vars_sha256=file_digest(variables))
-    with (report_dir / "serial.log").open("wb") as log, subprocess.Popen(
-        command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    ) as process:
-        try:
-            check_console(process, log, timeout)
-        finally:
-            if process.poll() is None:
-                process.kill()
-            log.write(process.stdout.read())
+    for slot in ("A", "B") if args.ab else (None,):
+        log_name = f"serial-{slot.lower()}.log" if slot else "serial.log"
+        with (report_dir / log_name).open("wb") as log, subprocess.Popen(
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        ) as process:
+            try:
+                check_console(process, log, timeout, slot)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                log.write(process.stdout.read())
+        if slot:
+            report.setdefault("verified_slots", []).append(slot)
 
 
 def main():
     version = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], capture_output=True, text=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
+    parser.add_argument("--ab", action="store_true", help="Inicia A e B e verifica o mesmo documento.")
     parser.add_argument("--log-dir", type=Path, default=Path("out/boot-tests"))
     parser.add_argument("--ovmf-code", type=Path, default=os.environ.get("OVMF_CODE"))
     parser.add_argument("--ovmf-vars", type=Path, default=os.environ.get("OVMF_VARS"))
@@ -161,7 +219,10 @@ def main():
     try:
         run(args, report_dir, report)
         report["exit_code"] = 0
-        print("Login serial UEFI, identidade Melkor, dinit como PID 1 e raiz somente para leitura verificados.")
+        if args.ab:
+            print("Slots A e B iniciados via UEFI. Documento criado em A e reaberto em B.")
+        else:
+            print("Login serial UEFI, identidade Melkor, dinit como PID 1 e raiz somente para leitura verificados.")
     except (OSError, RuntimeError) as error:
         report["error"] = str(error)
         print(error, file=sys.stderr)

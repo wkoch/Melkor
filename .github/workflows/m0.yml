@@ -1,4 +1,4 @@
-name: Melkor M0
+name: Melkor
 
 on:
   push:
@@ -10,10 +10,32 @@ permissions:
   contents: read
 
 jobs:
+  cobertura:
+    name: Testes e cobertura
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: registry.fedoraproject.org/fedora@sha256:130bdf7ec68a9834ae377c574c3f22992ae103197ef951deaac48e1e1eb7cf2d # Fedora 45 x86-64
+    steps:
+      - name: Instalar ferramentas de teste
+        run: dnf install -y --setopt=install_weak_deps=False git golang gcc openssh-clients python3 python3-pip kcov-43 make
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Executar suíte com limite de cobertura
+        run: |
+          python3 -m venv out/test-venv
+          out/test-venv/bin/python -m pip install --require-hashes --only-binary=:all: -r tests/requirements.txt
+          make test TEST_PYTHON=out/test-venv/bin/python
+
   boot-uefi:
-    name: Build e boot UEFI
+    name: Build e boot UEFI (${{ matrix.board }})
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [m0, m1]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -24,22 +46,25 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             bc binutils bison build-essential ca-certificates cpio diffutils file flex \
             gawk git gzip libncurses-dev m4 make patch perl python3 rsync tar unzip \
-            wget xz-utils qemu-system-x86 ovmf
+            wget xz-utils qemu-system-x86 ovmf e2fsprogs util-linux
       - name: Construir a imagem
-        run: make image
+        run: make image BOARD=${{ matrix.board }}
+      - name: Conferir o disco A/B
+        if: matrix.board == 'm1'
+        run: make check-m1
       - name: Fazer login em QEMU com OVMF
         env:
           QEMU_ACCEL: tcg
-        run: make test-boot
+        run: make test-boot BOARD=${{ matrix.board }}
       - name: Guardar evidências
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: melkor-m0-evidencias
+          name: melkor-${{ matrix.board }}-evidencias
           path: |
-            out/m0/build.log
-            out/m0/packages.json
-            out/m0/toolchain.txt
-            out/m0/SHA256SUMS
-            out/m0/tests/*/result.json
-            out/m0/tests/*/serial.log
+            out/${{ matrix.board }}/build.log
+            out/${{ matrix.board }}/packages.json
+            out/${{ matrix.board }}/toolchain.txt
+            out/${{ matrix.board }}/SHA256SUMS
+            out/${{ matrix.board }}/tests/*/result.json
+            out/${{ matrix.board }}/tests/*/serial*.log

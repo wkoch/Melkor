@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+    printf '%s\n' 'Uso: melkor-core-update /caminho/bundle.raucb' >&2
+    exit 2
+fi
+case "$1" in
+    /*) ;;
+    *) printf '%s\n' 'Informe o caminho absoluto do bundle.' >&2; exit 2 ;;
+esac
+uid=$(id -u)
+if [ "$uid" != 0 ]; then
+    printf '%s\n' 'Entre em uma sessão root para atualizar o core.' >&2
+    exit 1
+fi
+
+exec /usr/bin/flock --nonblock /run/melkor/rauc.lock /usr/bin/rauc install "$1"

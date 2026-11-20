@@ -1,0 +1,8 @@
+config BR2_PACKAGE_MELKOR_DHCPCD
+	bool "dhcpcd para o core Melkor"
+	depends on BR2_USE_MMU
+	depends on !BR2_PACKAGE_DHCPCD
+	help
+	  DHCP and IPv6 Router Advertisement client with leases in /run.
+
+	  https://github.com/NetworkConfiguration/dhcpcd

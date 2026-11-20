@@ -1,0 +1,3 @@
+# Release v0.86.0 após go mod vendor e reempacotamento do Buildroot.
+sha256  2e17f3420c5e18a47d366fe0f2294bd51e0be35046b7295a222d4b1af38cf256  dnsproxy-0.86.0-go2.tar.gz
+sha256  e2668ac346b320bf49452c23c9a59915bd9ebb3e6123f02fe83604dc18cafccf  LICENSE

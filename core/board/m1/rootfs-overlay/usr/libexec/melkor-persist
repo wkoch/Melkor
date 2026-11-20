@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mount -t ext4 -o nosuid,nodev UUID=a04e841b-82ca-478c-b741-4314eb96ee30 /persist
+install -d -m 0700 -o melkor -g melkor /persist/melkor
+mount -o bind /persist/melkor /home/melkor

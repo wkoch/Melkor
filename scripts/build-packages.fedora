@@ -1,6 +1,6 @@
 # Pacotes do contêiner melkor-build (Fedora 45), instalados por scripts/prepare-env.sh.
 # Corresponde à lista de ferramentas do workflow de CI (.github/workflows/m0.yml),
-# acrescida de headers usados pelo kernel no host e de qemu/OVMF para o teste de boot.
+# acrescida de headers usados pelo kernel, QEMU/OVMF para boot e tcpdump para DNS.
 bc
 binutils
 bison
@@ -8,6 +8,7 @@ bzip2
 cpio
 diffutils
 dosfstools
+e2fsprogs
 edk2-ovmf
 elfutils-libelf-devel
 file
@@ -41,8 +42,10 @@ python3
 qemu-system-x86-core
 rsync
 tar
+tcpdump
 texinfo
 unzip
-wget
+util-linux
+/usr/bin/wget
 which
 xz

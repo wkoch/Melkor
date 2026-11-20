@@ -1,0 +1,4 @@
+type = process
+command = /usr/bin/setpriv --reuid melkor-dns --regid melkor-dns --clear-groups --bounding-set=-all,+net_bind_service --inh-caps=-all,+net_bind_service --ambient-caps=-all,+net_bind_service --no-new-privs /usr/bin/dnsproxy --config-path=/etc/dnsproxy.json
+depends-on = network-local
+restart = true

@@ -1,0 +1,2 @@
+# Ferramenta de testes do host, wheel universal publicada em PyPI.
+coverage==7.17.3 --hash=sha256:21745c08f2835b847a16887b748d3084dddeb0571ae2a0d62e33644413568b99
