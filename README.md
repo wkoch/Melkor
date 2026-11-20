@@ -76,11 +76,15 @@ Registro do primeiro build offline (rede bloqueada com `http_proxy` em `127.0.0.
 | `make tools` | GNU Make e Go 1.24 ou posterior no host | Gera `out/tools/melkor`, um executável Linux x86-64 estático. |
 | `out/tools/melkor instalar nushell` | Podman rootless e rede para obter a imagem de build, a fonte e as dependências | Compila o Nushell 0.117.0 para musl, valida o executável e ativa uma geração do perfil. |
 | `out/tools/melkor atualizar` | Catálogo revisado e, quando houver mudanças, os mesmos pré-requisitos de instalação | Constrói receitas alteradas dos aplicativos instalados e ativa o conjunto após validar todas. |
+| `out/tools/melkor geracoes` | Perfil de aplicativos | Lista as gerações retidas com as versões dos aplicativos. O asterisco indica a geração ativa. |
+| `out/tools/melkor voltar <geração>` | Geração listada pelo comando anterior e seus artefatos locais | Reativa a geração sem reconstruir os aplicativos. Para pacotes importados, verifica se as imagens ainda existem no Podman. |
 | `out/tools/melkor shell` | Terminal interativo | Abre o Nushell da geração ativa ou usa `/bin/sh` quando o aplicativo está ausente. |
 
 O catálogo embutido fica em [apps/recipes](apps/recipes). Para experimentar um conjunto completo de receitas revisadas, defina `MELKOR_CATALOGO` com o caminho desse diretório. O catálogo selecionado deve conter as receitas de todos os aplicativos ativos para `melkor atualizar`. A receita do Nushell fixa o arquivo de [crates.io](https://crates.io/crates/nu/0.117.0) e a [imagem oficial do Rust](https://hub.docker.com/_/rust) usada no build. Cargo usa as versões e os checksums do `Cargo.lock` publicado. A compilação e os testes executam sem rede após a obtenção dos insumos. A variante inicial oferece o shell e seus comandos básicos com as funcionalidades opcionais do upstream desabilitadas.
 
-As gerações e seus manifestos ficam em `${XDG_DATA_HOME:-$HOME/.local/share}/melkor/geracoes/`. O link `atual` aponta para a geração ativa e só é trocado após um build validado. Para testar em um perfil temporário, defina `MELKOR_PERFIL` com o caminho absoluto do perfil de teste.
+As gerações e seus manifestos ficam em `${XDG_DATA_HOME:-$HOME/.local/share}/melkor/geracoes/`. O link `atual` é trocado depois de validar a geração a ativar. Para testar em um perfil temporário, defina `MELKOR_PERFIL` com o caminho absoluto do perfil de teste.
+
+O retorno troca apenas a geração de aplicativos. Os comandos seguintes usam o conjunto reativado e os dados de usuário continuam na versão atual.
 
 Para usar o Nushell no Alacritty, disponibilize o executável `melkor` no `PATH` da sessão e importe [apps/alacritty/melkor.toml](apps/alacritty/melkor.toml) pelo caminho do arquivo em `general.import` na configuração do terminal. Cada nova janela resolve o executável da geração ativa e inclui os aplicativos do perfil no `PATH`. Sem Nushell no perfil, o launcher usa `/bin/sh`. O console de recuperação usa `/bin/sh` diretamente. [Configuração do Alacritty](https://alacritty.org/config-alacritty.html)
 

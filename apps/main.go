@@ -18,7 +18,7 @@ func main() {
 }
 
 func run(args []string, replace func(string, []string, []string) error) error {
-	const usage = "Uso: melkor instalar <nome> | melkor atualizar | melkor importar | melkor executar <nome> [argumentos] | melkor remover <nome> | melkor shell [argumentos] | melkor catalogo | melkor receita"
+	const usage = "Uso: melkor instalar <nome> | melkor atualizar | melkor importar | melkor executar <nome> [argumentos] | melkor remover <nome> | melkor geracoes | melkor voltar <geração> | melkor shell [argumentos] | melkor catalogo | melkor receita"
 	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
 		fmt.Println(usage)
 		return nil
@@ -45,6 +45,14 @@ func run(args []string, replace func(string, []string, []string) error) error {
 	case "remover":
 		if len(args) == 2 {
 			return removeFromProfile(profile, args[1])
+		}
+	case "geracoes":
+		if len(args) == 1 {
+			return listGenerations(profile, os.Stdout)
+		}
+	case "voltar":
+		if len(args) == 2 {
+			return restoreGeneration(profile, args[1], packageOutput)
 		}
 	case "catalogo":
 		return catalogCommand(profile, args[1:])

@@ -93,7 +93,7 @@ Em 20 de novembro de 2026, o fluxo inicial instalou o Nushell 0.117.0 em um perf
 | `out/tools/melkor atualizar` com receita candidata cujo build executa `false` | Código de erro no build. O link ativo, o hash do binário e a versão 0.117.0 permaneceram iguais. O launcher voltou a executar a expressão e retornou `6`. |
 | `make check-m1` e boot de uma cópia do disco M1 com o perfil na ext4 | GPT verificado. QEMU com KVM iniciou ambos os slots. Em cada um, o launcher retornou `6` com Nushell e executou `/bin/sh` com um perfil vazio. Logs em `out/apps-m1.Ea5SHK/tests/boot-u1f_r69z/`. |
 
-A validação de abertura em uma janela do Alacritty depende da sessão Wayland do M2. O Nushell é a primeira receita do catálogo. A cobertura de falta de espaço, remoção, limpeza e retorno explícito de perfil continua prevista para M3.
+A validação de abertura em uma janela do Alacritty depende da sessão Wayland do M2. O Nushell é a primeira receita do catálogo. A cobertura de falta de espaço e a limpeza de gerações continuam previstas para M3.
 
 ### Validação de pacotes importados
 
@@ -107,6 +107,14 @@ Em 20 de novembro de 2026, o Bazzite com Podman rootless 6.1.3 executou a import
 | `sha256sum -c ../../SHA256SUMS` em `out/m1-doh/build/images/` | A imagem do core conferiu após os testes de importação. |
 
 O [procedimento de importação](TESTES.md#provas-de-importação-isolada) registra os pré-requisitos e o SHA-256 do RPM usado nos testes. A entrega validada cobre aplicativos de linha de comando. Instalar o runtime Podman no Melkor e integrar a execução gráfica continuam como etapas do projeto.
+
+### Validação do retorno de perfil
+
+| Comando ou cenário | Resultado |
+| --- | --- |
+| `melkor geracoes` e `melkor voltar <geração>` em uma cópia do perfil Nushell 0.117.0 | A lista identificou a geração ativa. Após remover o Nushell, `melkor shell` abriu `/bin/sh`. A reativação do perfil anterior trouxe o Nushell de volta e a expressão `[1 2 3] \| math sum` retornou `6`. Evidências em `out/retorno-nushell.pVhyn7/retorno.log`. |
+| `make test-packages OUT=out/importacao-m3.gtMyaJ/retorno …` | O DEB removido voltou a executar após reativar a geração anterior e leu o dado gravado. Foi possível selecionar de novo a geração mais recente sem o DEB. Evidências em `out/importacao-m3.gtMyaJ/retorno/package-tests/pacotes-1pwwcq44/`. |
+| `make test` | Rejeições de manifestos, caminhos, arquivos e imagens ausentes preservaram a geração ativa. Cobertura de 86,7% em Go, 95,7% em Python e 96,0% em Shell. Relatórios em `out/coverage/test-45esy_dp/`. |
 
 O catálogo separado passou pelo teste local de proposta, aceite, sincronização de tag SSH assinada e instalação em um segundo perfil sem IA. O primeiro PR real foi aberto pelo CLI e passou na CI do repositório privado. A primeira versão assinada do catálogo aguarda a revisão do PR. [Testes do catálogo](TESTES.md#publicação-e-consumo-de-receitas) · [PR #1](https://github.com/wkoch/Melkor-Recipes/pull/1)
 

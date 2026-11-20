@@ -83,15 +83,11 @@ func changeProfile(profile string, plan func(map[string]installed) (profileActio
 	if err := os.MkdirAll(generations, 0o700); err != nil {
 		return false, err
 	}
-	lock, err := os.OpenFile(filepath.Join(profile, ".lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	lock, err := lockProfile(profile)
 	if err != nil {
 		return false, err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
-		return false, err
-	}
-
 	current, packages, err := readProfile(profile)
 	if err != nil {
 		return false, err
@@ -101,6 +97,18 @@ func changeProfile(profile string, plan func(map[string]installed) (profileActio
 		return false, err
 	}
 	return publishProfile(profile, generations, current, packages, changes)
+}
+
+func lockProfile(profile string) (*os.File, error) {
+	lock, err := os.OpenFile(filepath.Join(profile, ".lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		lock.Close()
+		return nil, err
+	}
+	return lock, nil
 }
 
 func publishProfile(profile, generations, current string, packages map[string]installed, changes profileActions) (bool, error) {
@@ -172,15 +180,26 @@ func publishProfile(profile, generations, current string, packages map[string]in
 	if err := syncDir(generations); err != nil {
 		return false, err
 	}
-	link := filepath.Join(profile, "."+generation)
+	active, err := activateGeneration(profile, generation)
+	if active {
+		stage = ""
+	}
+	return active, err
+}
+
+func activateGeneration(profile, generation string) (bool, error) {
+	pending, err := os.MkdirTemp(profile, ".ativacao-")
+	if err != nil {
+		return false, err
+	}
+	defer os.RemoveAll(pending)
+	link := filepath.Join(pending, "atual")
 	if err := os.Symlink(filepath.Join("geracoes", generation), link); err != nil {
 		return false, err
 	}
-	defer os.Remove(link)
 	if err := os.Rename(link, filepath.Join(profile, "atual")); err != nil {
 		return false, err
 	}
-	stage = ""
 	fmt.Printf("Geração %s ativada.\n", generation)
 	return true, syncDir(profile)
 }
@@ -194,12 +213,34 @@ func readProfile(profile string) (string, map[string]installed, error) {
 		return "", nil, err
 	}
 	name := filepath.Base(target)
-	if !strings.HasPrefix(name, "g-") || !namePattern.MatchString(name) ||
-		target != filepath.Join("geracoes", name) {
+	if !validGeneration(name) || target != filepath.Join("geracoes", name) {
 		return "", nil, fmt.Errorf("geração ativa inválida: %q", target)
 	}
-	current := filepath.Join(profile, target)
-	data, err := os.ReadFile(filepath.Join(current, "manifest.json"))
+	return readGeneration(profile, name)
+}
+
+func validGeneration(name string) bool {
+	return strings.HasPrefix(name, "g-") && namePattern.MatchString(name)
+}
+
+func readGeneration(profile, name string) (string, map[string]installed, error) {
+	current := filepath.Join(profile, "geracoes", name)
+	info, err := os.Lstat(current)
+	if err != nil {
+		return "", nil, err
+	}
+	if !info.IsDir() {
+		return "", nil, fmt.Errorf("geração inválida: %s", name)
+	}
+	manifest := filepath.Join(current, "manifest.json")
+	info, err = os.Lstat(manifest)
+	if err != nil {
+		return "", nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return "", nil, errors.New("manifesto do perfil precisa ser um arquivo regular")
+	}
+	data, err := os.ReadFile(manifest)
 	if err != nil {
 		return "", nil, err
 	}

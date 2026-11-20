@@ -128,6 +128,14 @@ O executor gera um DEB de teste com uma dependência real e um `postinst` que ex
 
 Para garantir isolamento também nos testes manuais, mantenha o armazenamento rootless normal do Podman e mude apenas `MELKOR_PERFIL`. A importação foi exercitada no host Bazzite. A inclusão de Podman e do CLI na imagem instalada e o lançamento gráfico ainda dependem dos respectivos marcos.
 
+## Retorno de gerações do perfil
+
+A suíte Go cobre o retorno de um perfil de testes para uma geração com binário nativo e configuração. Também rejeita imagens OCI ausentes, executáveis ou configurações substituídos por links, manifestos inválidos e identificadores que escapam da pasta de gerações. Cada falha deve preservar o link `atual`.
+
+`make test-packages` lista o perfil após remover o DEB, volta à geração anterior e reabre o dado gravado no aplicativo. O mesmo teste reativa a geração posterior e confirma que o DEB voltou a ficar ausente. Use os mesmos pré-requisitos do teste de importação.
+
+Com uma cópia de um perfil que já contém Nushell, use `melkor geracoes` e guarde o identificador da geração ativa. Execute `melkor remover nushell` e confira que `melkor shell -c 'printf "%s\n" "$0"'` abre `/bin/sh`. Use `melkor voltar <geração>` e execute `melkor shell --no-config-file -c '[1 2 3] | math sum'`. O shell reativado deve retornar `6`.
+
 ## Automação
 
 - **Por alteração.** Executar testes unitários dos componentes afetados. Para o instalador, cobrir resolução de dependências, verificação de hashes, ativação de perfis e limpeza. Mudanças na composição do core executam o boot serial.

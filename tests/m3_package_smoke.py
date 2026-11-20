@@ -115,8 +115,16 @@ def main():
         run("rpm-apos-remocao", melkor, "executar", "rpm", "--version", message="tree v")
         if (profile / "dados/deb/prova").read_text() != "dado isolado\n":
             raise RuntimeError("Os dados do pacote removido foram alterados.")
+        removed = (profile / "atual").readlink()
+        run("listar-geracoes", melkor, "geracoes", message=f"* {removed.name}")
+        run("voltar-geracao", melkor, "voltar", active.name)
+        if (profile / "atual").readlink() != active:
+            raise RuntimeError("A geração retida não foi reativada.")
+        run("ler-apos-retorno", melkor, "executar", "deb", "ler", message="dado isolado")
+        run("avancar-geracao", melkor, "voltar", removed.name)
+        run("executar-removido-novamente", melkor, "executar", "deb", "ler", rejected=True)
         report["codigo_saida"] = 0
-        print("Importação, scripts offline, dados, rejeições e remoção verificados.")
+        print("Importação, scripts offline, dados, rejeições, remoção e retorno verificados.")
     except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
         report.update(codigo_saida=1, erro=str(error))
         print(error)
