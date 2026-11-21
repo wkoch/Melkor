@@ -134,6 +134,8 @@ O executor verifica a configuração de fábrica, seleciona um servidor alternat
 
 Os builds oficiais recebem os arquivos públicos versionados em `core/board/pc/keys/` por `MELKOR_RAUC_KEYRING` e `MELKOR_CHANNEL_PUBLIC_KEY`. Compare os PEM dentro do SquashFS com esses arquivos antes de gerar a ISO. Use as chaves e os certificados de laboratório nos testes automatizados de atualização, que também usam o certificado de teste para servir HTTPS.
 
+A edição pública de console usa `make image BOARD=pc MELKOR_PC_MINIMAL=1 OUT=out/pc-minimal` com a revisão e as chaves da release. Monte a mídia com `make installer-iso PC_OUT=out/pc-minimal OUT=out/installer` e execute `make test-installer OUT=out/installer`. O alvo mínimo mantém a geometria do PC, as contas, o armazenamento de Wi-Fi e a compatibilidade RAUC. Um bundle que traga o desktop pode promover a instalação em uma revisão posterior.
+
 Publique a ISO, seu SHA-256 e o bundle gerado por `make bundle-pc` na release versionada de `wkoch/Melkor`. Cada arquivo de uma release precisa ter menos de 2 GiB. [Limites do GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)
 
 Depois de conferir o download do bundle sem autenticação, execute `make channel-pc` com o mesmo `OUT`, `VERSION` e `KEYRING`. Em `BUNDLE_URL`, passe a URL HTTPS do bundle na tag versionada. Envie somente o `melkor-pc-channel.json` assinado à release `pc-stable` do mesmo repositório. Essa release precisa aceitar a substituição do manifesto nas próximas publicações. Renove-o antes da validade de 90 dias ou ajuste `CHANNEL_DAYS`. Use a chave privada do canal só no ambiente de assinatura.

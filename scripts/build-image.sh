@@ -12,6 +12,11 @@ case "$board" in
     live|installer) rootfs_option=BR2_TARGET_ROOTFS_CPIO_GZIP ;;
     *) echo "Alvo desconhecido: $board. Use BOARD=m0, m1, live, pc ou installer." >&2; exit 2 ;;
 esac
+if [[ ${MELKOR_PC_MINIMAL:-0} == 1 ]] &&
+   [[ "$board" != pc || -n "${MELKOR_PC_DESKTOP_LAYER:-}${MELKOR_PC_CHROMIUM_LAYER:-}${MELKOR_PC_SESSION_LAYER:-}" ]]; then
+    echo "MELKOR_PC_MINIMAL=1 exige BOARD=pc e camadas de desktop desabilitadas." >&2
+    exit 2
+fi
 output=$(realpath -m -- "${1:-out/$board}")
 cache="$project/out/dl"
 # Sem rede, use o bundle criado por scripts/prepare-env.sh. MELKOR_BUILDROOT_URL substitui a origem.
@@ -50,7 +55,13 @@ fi
 git -C "$source" -c advice.detachedHead=false checkout -q --detach "$buildroot_commit"
 
 buildroot_make=(make --no-print-directory -C "$source" "O=$build" "BR2_EXTERNAL=$project/core" "BR2_DL_DIR=$cache")
-"${buildroot_make[@]}" "melkor_${board}_defconfig"
+if [[ ${MELKOR_PC_MINIMAL:-0} == 1 ]]; then
+    sed -E '/^BR2_PACKAGE_(SEATD|SEATD_DAEMON|WESTON|WESTON_DEFAULT_DRM|FOOT|MELKOR_NUSHELL|BUBBLEWRAP|DEJAVU)=/d' \
+        "$project/core/configs/melkor_pc_defconfig" > "$output/pc-minimal.defconfig"
+    "${buildroot_make[@]}" "BR2_DEFCONFIG=$output/pc-minimal.defconfig" defconfig
+else
+    "${buildroot_make[@]}" "melkor_${board}_defconfig"
+fi
 for option in BR2_TOOLCHAIN_BUILDROOT_MUSL BR2_GCC_VERSION_14_X BR2_INIT_NONE \
     BR2_PACKAGE_DINIT BR2_TARGET_GRUB2_X86_64_EFI "$rootfs_option" \
     BR2_DOWNLOAD_FORCE_CHECK_HASHES; do

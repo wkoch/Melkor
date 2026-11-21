@@ -21,6 +21,14 @@ if [ -n "${MELKOR_CHANNEL_PUBLIC_KEY:-}" ]; then
 else
     rm -f "$config/channel.pem"
 fi
+if [ "${MELKOR_PC_MINIMAL:-0}" = 1 ]; then
+    sed -i '/^waits-for = seatd$/d' "$1/etc/dinit.d/boot"
+    printf '%s\n' 'Melkor Linux PC. Use iwctl para configurar o Wi-Fi.' > "$1/etc/motd"
+    rm -f "$1/etc/dinit.d/seatd" "$1/usr/libexec/melkor-desktop-session"
+    for launcher in desktop terminal session-exec browser firefox brave-origin blanc; do
+        rm -f "$1/usr/bin/melkor-$launcher"
+    done
+fi
 if [ -n "${MELKOR_PC_DESKTOP_LAYER:-}" ]; then
     install -d "$1/opt/melkor-desktop"
     tar -xzf "$MELKOR_PC_DESKTOP_LAYER" -C "$1/opt/melkor-desktop"

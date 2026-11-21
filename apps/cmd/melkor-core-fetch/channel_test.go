@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ecdh"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -17,6 +18,29 @@ import (
 	"testing"
 	"time"
 )
+
+func TestCanalRecusaChavesPublicasInvalidas(t *testing.T) {
+	wrong, err := ecdh.X25519().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrongDER, err := x509.MarshalPKIXPublicKey(wrong.PublicKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		key   []byte
+		error string
+	}{
+		{[]byte("sem PEM"), "chave pública"},
+		{pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: []byte{1, 2, 3}}), "asn1"},
+		{pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: wrongDER}), "Ed25519"},
+	} {
+		if _, err := verifyRelease(nil, tc.key, time.Now()); err == nil || !strings.Contains(err.Error(), tc.error) {
+			t.Fatalf("erro esperado %q, obtido %v", tc.error, err)
+		}
+	}
+}
 
 func TestChannel(t *testing.T) {
 	pub, key, err := ed25519.GenerateKey(rand.Reader)

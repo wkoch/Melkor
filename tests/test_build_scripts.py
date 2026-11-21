@@ -23,6 +23,7 @@ class BuildScriptsTest(unittest.TestCase):
         for name in ("build-image.sh", "prepare-env.sh", "build-packages.fedora"):
             shutil.copy2(ROOT / "scripts" / name, cls.scripts)
         shutil.copytree(ROOT / "core" / "board", cls.project / "core" / "board", symlinks=True)
+        shutil.copytree(ROOT / "core" / "configs", cls.project / "core" / "configs")
         cls.stub = cls.work / "tool_stub.py"
         shutil.copyfile(ROOT / "tests/tool_stub.py", cls.stub)
         cls.stub.chmod(0o755)
@@ -188,6 +189,31 @@ source "$script" "$@"
         text = self.run_script(script, "out/config", code=1, TEST_MISSING_OPTION="BR2_DOWNLOAD_FORCE_CHECK_HASHES")
         self.assertIn("não ativou BR2_DOWNLOAD_FORCE_CHECK_HASHES", text)
         self.assertFalse(any("show-info" in command for command in self.commands()))
+
+    def test_build_minimo_mantem_a_rede_e_rejeita_camadas_graficas(self):
+        script = self.scripts / "build-image.sh"
+        minimal = {"MELKOR_PC_MINIMAL": "1"}
+        self.run_script(script, "out/minimo", "live", code=2, **minimal)
+        self.run_script(script, "out/minimo", "pc", code=2, MELKOR_PC_DESKTOP_LAYER="desktop.tar.gz", **minimal)
+        self.run_script(script, "out/minimo", "pc", **minimal)
+        defconfig = self.out / "minimo" / "pc-minimal.defconfig"
+        config = defconfig.read_text()
+        for package in ("DNSPROXY", "IWD", "RAUC"):
+            self.assertIn(f"BR2_PACKAGE_{package}=y", config)
+        for package in ("WESTON", "FOOT", "MELKOR_NUSHELL", "SEATD"):
+            self.assertNotIn(f"BR2_PACKAGE_{package}=y", config)
+        self.assertTrue(any(f"BR2_DEFCONFIG={defconfig}" in command for command in self.commands()))
+
+    def test_pc_minimo_desativa_a_sessao_grafica(self):
+        board = self.project / "core/board/pc"
+        target = self.out / "minimo"
+        shutil.copytree(board / "rootfs-overlay", target, symlinks=True)
+        self.run_script(board / "post-build.sh", target, MELKOR_PC_MINIMAL="1")
+        services = (target / "etc/dinit.d/boot").read_text()
+        self.assertIn("waits-for = wifi", services)
+        self.assertNotIn("seatd", services)
+        self.assertIn("iwctl", (target / "etc/motd").read_text())
+        self.assertFalse((target / "usr/bin/melkor-desktop").exists())
 
     def test_preparo_host_cria_ou_reusa_container(self):
         not_inside = self.work / "host"
