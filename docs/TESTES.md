@@ -60,6 +60,8 @@ Execute `make check-env BOARD=live`, `make image BOARD=live OUT=out/live-hp` e `
 
 Para iniciar a ISO como CD UEFI, execute `distrobox enter -n melkor-build -- python3 scripts/test-boot.py out/live-hp/build/images/melkor-live.iso --live --log-dir out/live-hp/iso-tests`. Em um host que já tem os pré-requisitos do QEMU e OVMF, execute o mesmo comando a partir de `python3`. Para testar o Ventoy, copie essa mesma ISO para a partição de dados de um pendrive Ventoy virtual, selecione o modo normal no menu e confirme o login pelo console de vídeo da VM.
 
+O teste Live verifica a presença do firmware da AX200 e dos dois arquivos da base regulatória. O executor consulta o domínio mundial com `iw reg get` e examina `dmesg` para detectar falhas de carregamento ou de assinatura da base. Para validar a incorporação no kernel, compare a seção `.rodata` de `drivers/base/firmware_loader/builtin/iwlwifi-cc-a0-77.ucode.gen.o` à fonte verificada e cheque o símbolo `_fw_iwlwifi_cc_a0_77_ucode_bin` em `vmlinux`. A inicialização da interface Wi-Fi é exercitada no HP.
+
 Depois da validação virtual, use a mídia no notebook para conferir o console com tela e teclado locais e obter os IDs dos componentes. [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 
 ## Protótipo A/B do M1

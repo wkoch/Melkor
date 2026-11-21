@@ -4,9 +4,9 @@ Este documento define o perfil de instalação para os PCs pessoais do William. 
 
 ## Teste de hardware pelo pendrive
 
-Use a ISO Melkor Live em um pendrive com Ventoy. O sistema carrega o kernel e a raiz em RAM e perde os arquivos feitos durante a sessão ao desligar. Ele enumera os dispositivos sem montar os discos. Esta etapa identifica quais drivers o notebook precisa para a futura instalação. [Melkor Live v0.1.0-alpha.2](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.2)
+Use a ISO Melkor Live em um pendrive com Ventoy. O sistema carrega o kernel e a raiz em RAM e perde os arquivos feitos durante a sessão ao desligar. Ele enumera os dispositivos sem montar os discos. Esta etapa identifica quais drivers o notebook precisa para a futura instalação. [Melkor Live v0.1.0-alpha.3](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.3)
 
-1. Baixe `melkor-live-v0.1.0-alpha.2-x86_64.iso` e `SHA256SUMS`. Confira a ISO com `sha256sum --ignore-missing -c SHA256SUMS` no diretório do download.
+1. Baixe `melkor-live-v0.1.0-alpha.3-x86_64.iso` e `SHA256SUMS`. Confira a ISO com `sha256sum --ignore-missing -c SHA256SUMS` no diretório do download.
 2. Copie o arquivo `.iso` para a partição de dados do pendrive Ventoy, como um arquivo comum. [Como copiar imagens para o Ventoy](https://www.ventoy.net/en/doc_start.html)
 3. No HP ProBook x360 435 G7, ligue o notebook, pressione `Esc` e depois `F9` e escolha a entrada UEFI do pendrive. O GRUB desta mídia é sem assinatura e requer Secure Boot desativado. Se usar Windows com BitLocker, tenha acesso à chave de recuperação antes de alterar a configuração do firmware. Preserve o modo UEFI e restaure a configuração anterior depois do teste. [Secure Boot no HP](https://support.hp.com/in-en/document/ish_6930187-6931079-16) · [Recuperação do BitLocker](https://learn.microsoft.com/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview)
 4. No Ventoy, selecione a ISO e escolha **Boot in normal mode**, se aparecer o menu de modos. Se o modo normal não iniciar nessa unidade, o menu oferece **Boot in grub2 mode**. Selecione **Melkor Linux - diagnostico em RAM**. No console local, entre com `melkor` como usuário e senha. `id` deve indicar UID 1000 e `cat /proc/mounts` mostra a raiz em memória.
@@ -14,6 +14,12 @@ Use a ISO Melkor Live em um pendrive com Ventoy. O sistema carrega o kernel e a 
 6. Fotografe ou anote as saídas relevantes e encerre a sessão. Desligue pelo botão de energia, mantendo-o pressionado se necessário, e remova o pendrive para voltar ao sistema habitual.
 
 Nesta mídia, a verificação de vídeo usa o framebuffer do firmware e o Wi-Fi se limita à detecção da interface. A autenticação por digital, a conexão Wi-Fi, os testes de suspensão e a sessão gráfica fazem parte das próximas validações no notebook.
+
+Na unidade de referência, a placa Wi-Fi é uma Intel AX200 (`8086:2723`). Quando `/usr/sbin/iw dev` sair vazio, fotografe a saída abaixo. O log indica se o driver encontrou o firmware e se registrou a interface.
+
+```sh
+dmesg | grep -Ei 'iwlwifi|iwlmvm|01:00[.]0|rfkill|regulatory'
+```
 
 ## Decisões
 
@@ -41,7 +47,7 @@ A validação da instalação inclui reconexão, comportamento com o relógio in
 
 O catálogo atual foi validado com executáveis estáticos x86-64. Os navegadores exigem empacotamento de binários e dependências privadas ou builds compatíveis com a base musl. A receita de Firefox do Alpine dá um ponto de partida para validar as dependências em musl. O Brave Origin distribui pacotes Linux para as famílias Debian e RPM, e o Blanc distribui AppImages com Electron. Cada receita deve preservar o sandbox suportado pelo navegador, abrir uma página em Wayland e validar downloads, áudio e arquivos locais antes de entrar no perfil de fábrica. [Receita do Firefox no Alpine](https://github.com/alpinelinux/aports/blob/master/community/firefox/APKBUILD) · [Brave Origin para Linux](https://brave.com/origin/linux/) · [Blanc e sandbox no Linux](https://github.com/bnfy/blanc)
 
-O notebook de referência é o **HP ProBook x360 435 G7 (18Z98LA)**. O sensor Synaptics `06cb:00df` aparece em algumas configurações dessa família e consta na lista do libfprint. É o primeiro ID a conferir na unidade do William. O host de desenvolvimento consultado é um desktop e devolveu `No devices available` com `fprintd-list`. A validação do notebook inclui detecção do leitor, cadastro, desbloqueio, alternativa por senha e retorno da suspensão. [Suporte HP](https://support.hp.com/us-en/product/product-specs/hp-probook-x360-435-g7-notebook-pc/32611820) · [Documentação do modelo no Arch Linux](https://wiki.archlinux.org/title/HP_ProBook_x360_435_G7) · [IDs suportados pelo libfprint](https://fprint.freedesktop.org/supported-devices.html)
+O notebook de referência é o **HP ProBook x360 435 G7 (18Z98LA)**. O `lsusb` na unidade do William confirmou o leitor Synaptics `06cb:00df`, listado pelo libfprint. A validação biométrica inclui cadastro, desbloqueio, alternativa por senha e retorno da suspensão. [Suporte HP](https://support.hp.com/us-en/product/product-specs/hp-probook-x360-435-g7-notebook-pc/32611820) · [IDs suportados pelo libfprint](https://fprint.freedesktop.org/supported-devices.html)
 
 O Buildroot fixado pelo projeto já oferece receitas de Linux-PAM e D-Bus. A integração do M2 precisa incluir receitas para libfprint e fprintd, habilitar a ativação do serviço pelo D-Bus de sistema e validar o módulo PAM no login e no desbloqueio.
 

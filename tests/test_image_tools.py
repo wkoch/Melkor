@@ -29,7 +29,8 @@ LOGIN = b"\rmelkor login: \n\rPassword: \nmelkor$ \n"
 PROBE = b"M0-ID=melkor\nM0-PID1=dinit\nM0-LOGIN=melkor\nM0-UEFI=yes\nM0-ROOT=squashfs,ro\nM0-END\n"
 MENU = b"Melkor Linux M1 - slot B\nPress enter to boot the selected OS\n*Melkor Linux M1 - slot A\n"
 LIVE = (b"LIVE-VERSION=live\nLIVE-USER=ok\nLIVE-DISPLAY=ok\nLIVE-DEVICES=ok\n"
-        b"LIVE-PERMISSIONS=ok\nLIVE-TOOLS=ok\nLIVE-RAM=ok\nLIVE-HOME=ok\nLIVE-END\n")
+        b"LIVE-PERMISSIONS=ok\nLIVE-TOOLS=ok\nLIVE-RAM=ok\nLIVE-HOME=ok\nLIVE-END\n"
+        b"LIVE-FIRMWARE=ok\nLIVE-REGDB=ok\nLIVE-WIFI-END\n")
 
 
 class BundleTest(unittest.TestCase):
@@ -110,7 +111,8 @@ class SerialTest(unittest.TestCase):
         with console(LOGIN + PROBE + LIVE) as process:
             boot.check_live_console(process, io.BytesIO(), timeout=1)
             self.assertIn(boot.LIVE_PROBE.encode(), process.stdin.getvalue())
-        for field in (b"LIVE-RAM=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-USER=ok"):
+            self.assertIn(boot.LIVE_WIFI_PROBE.encode(), process.stdin.getvalue())
+        for field in (b"LIVE-RAM=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-USER=ok", b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok"):
             with self.subTest(field=field), console(LOGIN + PROBE + LIVE.replace(field, b"")) as process:
                 with self.assertRaisesRegex(RuntimeError, field.decode()):
                     boot.check_live_console(process, io.BytesIO(), timeout=1)

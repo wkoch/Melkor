@@ -56,6 +56,14 @@ LIVE_PROBE = (
     'printf "ram\\n" > "$HOME/.melkor-live-probe" && printf "LIVE-HOME=ok\\n"; '
     'printf "LIVE-END\\n"'
 )
+LIVE_WIFI_PROBE = (
+    'cd /lib/firmware && [ -s iwlwifi-cc-a0-77.ucode ] && [ -s regulatory.db ] '
+    '&& [ -s regulatory.db.p7s ] && printf "\\nLIVE-FIRMWARE=ok\\n"; '
+    'kernel_log=$(dmesg) && ! printf "%s\\n" "$kernel_log" | '
+    'grep -Ei "failed to load regulatory[.]db|regulatory[.]db.*(malformed|invalid|error)" '
+    '&& /usr/sbin/iw reg get | grep -q "^country 00:" && printf "LIVE-REGDB=ok\\n"; '
+    'printf "\\nLIVE-WIFI-END\\n"'
+)
 
 
 def file_digest(path):
@@ -177,10 +185,12 @@ def check_live_console(process, log, timeout, optical=False):
         media = "grep -qx 5 /sys/bus/scsi/devices/*/type" if optical else "[ -b /dev/sda ]"
         console.send(f"live_media() {{ {media}; }}; {LIVE_PROBE}".encode("ascii"))
         live = console.expect(rb"^LIVE-END\r?$", "verificação do ambiente em RAM")
-    lines = system.splitlines() + live.splitlines()
+        console.send(LIVE_WIFI_PROBE.encode("ascii"))
+        wifi = console.expect(rb"^LIVE-WIFI-END\r?$", "verificação do firmware de Wi-Fi")
+    lines = system.splitlines() + live.splitlines() + wifi.splitlines()
     for field in (b"M0-ID=melkor", b"M0-PID1=dinit", b"M0-UEFI=yes", b"LIVE-VERSION=live", b"LIVE-USER=ok",
                   b"LIVE-DISPLAY=ok", b"LIVE-DEVICES=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-TOOLS=ok",
-                  b"LIVE-RAM=ok", b"LIVE-HOME=ok"):
+                  b"LIVE-RAM=ok", b"LIVE-HOME=ok", b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok"):
         if field not in lines:
             raise RuntimeError(f"Verificação da mídia live falhou: {field.decode('ascii')}.")
 

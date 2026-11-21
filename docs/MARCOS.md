@@ -154,3 +154,19 @@ O primeiro teste físico usa a ISO `v0.1.0-alpha.2` pelo Ventoy. O boot abre um 
 | `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | Com Go, coverage.py e kcov, a suíte passou com 86,7% em Go, 95,3% em Python e 96,9% em Shell. |
 
 O SHA-256 da ISO é `3a855577a11f6f4418a24f9cc9a6863b136db8ab4a80975ab2d4fcd080010b93`. A edição do M1 para QEMU também passou pela revalidação de boot A/B e persistência. Na imagem separada de laboratório, o procedimento de `make test-update OUT=out/m1-doh …` passou nos cenários de candidata saudável, falha antes da confirmação e interrupção da gravação.
+
+### Teste físico da AX200
+
+A alpha.2 iniciou pelo Ventoy no HP ProBook x360 435 G7, com teclado e vídeo, e detectou o SSD NVMe e o leitor Synaptics `06cb:00df`. No Fedora Atomic COSMIC da mesma unidade, a Intel AX200 (`8086:2723`) registrou `wlp1s0` via `iwlwifi` e se associou em 5 GHz. No Live, o driver solicitou `iwlwifi-cc-a0-77.ucode` e recebeu `-ENOENT`. A extração da ISO e o console do QEMU confirmaram o arquivo no initramfs. A origem da falha de busca no boot físico ainda não foi isolada. O mesmo log registrou `pci_enable_msi failed -38` e `failed to load regulatory.db`.
+
+A alpha.3 embute o firmware no kernel, habilita PCI MSI e inclui a base regulatória assinada do `cfg80211`. O próximo teste no notebook volta a consultar `/usr/sbin/iw dev`. [Release Live](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.3)
+
+| Comando ou cenário | Resultado |
+| --- | --- |
+| `make env BOARD=live` e `make image BOARD=live OUT=out/live-hp-wifi` | O Buildroot verificou os hashes das fontes e concluiu o build limpo no contêiner Fedora 45. `nm` confirmou os símbolos de firmware em `vmlinux`. `objcopy --dump-section` extraiu os bytes para comparação com os arquivos das receitas fixadas. Os kernels de ISO 9660 e El Torito conferiram com o binário auditado. |
+| `make test-boot BOARD=live OUT=out/live-hp-wifi` e `python3 scripts/test-boot.py out/live-hp-wifi/build/images/melkor-live.iso --live --log-dir out/live-hp-wifi/iso-tests` | USB e CD inicializaram em QEMU com OVMF e TCG. O teste aprovou o firmware, a base regulatória e o hash do NVMe gravável. O mesmo executor rejeitou a alpha.2 pela ausência da base. |
+| Boot direto em QEMU com initramfs descartável sem `regulatory.db` e `.p7s` | Com o mesmo initramfs nos dois boots, o kernel da alpha.3 usou a base incorporada. O kernel da alpha.2 registrou a falha esperada. |
+| Ventoy 1.1.18 no QEMU | Os modos normal e GRUB2 chegaram ao login com teclado local. O hash do NVMe virtual permaneceu igual em ambos. |
+| `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | Cobertura de 86,7% em Go, 95,3% em Python e 96,9% em Shell. Os boots de regressão do M0 e do M1 passaram. |
+
+O SHA-256 da ISO é `b1570905e948e0c20a21fb194b625f0c884336afea637669da49ca320795570b`.

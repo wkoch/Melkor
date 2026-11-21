@@ -54,6 +54,8 @@ O GNU xorriso 1.5.4.pl02 da receita do Buildroot roda no host de build. A imagem
 
 As receitas do Buildroot fixado fornecem `iw` 6.9 e `libnl` 3.11.0 para a enumeração das interfaces. `linux-firmware` 20250211 entra na mídia com a seleção `22260` para o Intel AX200 e os arquivos `rtw88` para placas Realtek. O Buildroot verifica os hashes das fontes. O kernel e os utilitários do Live entram apenas nessa mídia. [Receitas no Buildroot fixado](https://gitlab.com/buildroot.org/buildroot/-/tree/2025.02.20/package) · [Opções Intel na família HP](https://jp.ext.hp.com/notebooks/business/probook_x360_435_g7/) · [Suporte Realtek listado pela HP](https://support.hp.com/soar-attachment/977/col94858-ob-276296-1-ob-276296-1_sp121426_releasedoc.html)
 
+O kernel Live habilita interrupções PCI MSI e incorpora `iwlwifi-cc-a0-77.ucode`, a versão requerida pelo `iwlwifi` 6.12 para o AX200. A extensão de build copia o arquivo da receita `linux-firmware` após a verificação da fonte. Ela também incorpora `regulatory.db` e `regulatory.db.p7s`, fornecidos pela receita `wireless-regdb` 2026.09.03. O `cfg80211` valida a assinatura da base. Os três arquivos também ficam acessíveis no initramfs. [Firmware incorporado no Linux](https://docs.kernel.org/6.12/driver-api/firmware/built-in-fw.html)
+
 ## Política de dependências
 
 | Camada | Política |
