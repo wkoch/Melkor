@@ -23,7 +23,9 @@ O fluxo previsto é baixar uma geração assinada do Melkor pela própria instal
 
 Quem modificar a receita poderá gerar a própria imagem em um ambiente de build, com as fontes e ferramentas necessárias. Isso pode ser feito localmente em vez de depender de outra máquina. Os projetos de origem fornecem as versões e correções usadas pelas receitas. A instalação e suas atualizações dispensam enviar alterações a esses projetos.
 
-O M1 usa RAUC para atualizar o core por um bundle local assinado. Entre em uma sessão root para executar `melkor-core-update /caminho/bundle.raucb` e reinicie para testar a geração instalada. A publicação e o download de gerações ainda fazem parte da entrega. `melkor atualizar` atende aos aplicativos do catálogo e compila só as receitas revisadas que mudaram. [Marcos](docs/MARCOS.md)
+No PC, entre com `su -` e execute `melkor-core-update`. A imagem traz o endereço do canal estável do Melkor. Com uma release assinada disponível no canal, o comando encontra a revisão, valida o manifesto e instala o bundle no slot inativo. Reinicie para ativá-lo. O endereço oficial está configurado no build e a primeira publicação no canal está pendente.
+
+Para usar outro endereço HTTPS que publique manifestos assinados pela chave do canal, execute `melkor-core-update --channel URL`. A escolha persiste entre atualizações. Use `melkor-core-update --reset-channel` para restaurar o endereço de fábrica. Para instalar um bundle específico, o PC aceita `melkor-core-update --https URL SHA256` e o PC e o M1 aceitam `melkor-core-update /caminho/bundle.raucb`. `melkor atualizar` atende aos aplicativos do catálogo. [Marcos](docs/MARCOS.md)
 
 ## Começar com o Codex
 
@@ -69,9 +71,9 @@ O host Bazzite é imutável e não tem `sudo` sem senha. As ferramentas de build
 | `make test-update OUT=out/m1-rauc CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Imagem M1 com certificado e credencial descartáveis, Python 3.11+, QEMU, OVMF, `mke2fs` e `sfdisk` | Testa instalação, rejeições, confirmação e recuperação do core em cópias do disco. [Procedimento de laboratório](docs/TESTES.md#bundles-assinados-e-recuperação-m1) |
 | `make bundle-pc CERT=… KEY=… KEYRING=… VERSION=…` e `make test-update BOARD=pc CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Build e disco virtual PC com as credenciais do laboratório | Usa a compatibilidade RAUC própria do PC e testa a atualização em discos descartáveis. |
 | `make test-update-https CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Build e disco virtual PC, Python 3.11+, QEMU, OVMF, OpenSSL e `mke2fs` | Serve bundles por TLS local e verifica rejeições, promoção e persistência em uma cópia do disco. [Procedimento](docs/TESTES.md#download-https-de-atualizações-do-pc) |
+| `make channel-pc VERSION=… KEYRING=… CHANNEL_KEY=… BUNDLE_URL=…` | Bundle PC já criado, chave Ed25519 privada do canal, chaveiro RAUC e ferramentas do build | Verifica o bundle e gera `OUT/melkor-pc-channel.json` com a revisão extraída do SquashFS. |
+| `make test-channel-pc CERT=… KEY=… ROOT_PASSWORD_FILE=… CHANNEL_KEY=… CHANNEL_CANDIDATE=…` | Dois builds PC com revisões crescentes e chaves descartáveis | Exercita a atualização sem argumentos e a troca persistente de canal. [Procedimento](docs/TESTES.md#canal-de-atualizações-do-pc) |
 | `make test` | Go 1.24+, compilador C, Python 3.11+, coverage.py e kcov | Executa a suíte local e reprova cobertura abaixo de 80%. [Preparação e critérios](docs/TESTES.md#cobertura-do-código-próprio) |
-
-Para atualizar um PC já instalado, entre com `su -` e execute `melkor-core-update --https URL SHA256` com a URL e o SHA-256 do bundle fornecidos pelo mantenedor. A instalação precisa já confiar no certificado usado para assinar o bundle. Depois que o comando concluir, reinicie para iniciar a geração nova. Esse fluxo dispensa compilar o Melkor na máquina instalada. O canal público de releases assinadas está pendente.
 
 Em um ambiente com as ferramentas já instaladas, use `BUILD_ENV=` para executar os comandos diretamente. No CI, a execução direta é o padrão. O teste de boot requer Python 3.11 ou posterior, QEMU e um par OVMF em formato raw. Em M0, ele abre a imagem somente para leitura. Em M1, usa uma cópia gravável da imagem. Ambos usam uma cópia privada das variáveis UEFI em `OUT/tests/`.
 

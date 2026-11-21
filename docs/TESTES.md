@@ -103,6 +103,20 @@ make test-update-https OUT=out/pc-https CERT="$lab/cert.pem" KEY="$lab/key.pem" 
 
 O executor abre um servidor TLS em loopback e usa uma cópia do disco com rede virtual. O caso de assinatura adulterada usa o SHA-256 do arquivo adulterado para verificar a rejeição pelo RAUC mesmo após validar o download. O teste confere que certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida preservam a ordem do GRUB e o slot inativo. O bundle válido promove B. O segundo boot confirma B e lê o documento salvo em A. Os logs seriais ficam em `OUT/https-tests/`.
 
+## Canal de atualizações do PC
+
+Prepare dois builds PC no mesmo ambiente de laboratório, com `MELKOR_CORE_REVISION=1` e `MELKOR_CORE_REVISION=2`, `MELKOR_RAUC_KEYRING` apontando para o certificado descartável e `MELKOR_CHANNEL_PUBLIC_KEY` apontando para a chave pública do canal. Gere o par descartável com `openssl genpkey -algorithm ED25519` e exporte a pública em PEM com `openssl pkey -pubout`. Prepare o disco virtual com credenciais no diretório do build da revisão 1.
+
+```sh
+make test-channel-pc OUT=out/pc-1 CERT="$lab/cert.pem" KEY="$lab/key.pem" \
+    ROOT_PASSWORD_FILE="$lab/senha-root" CHANNEL_KEY="$lab/channel.key" \
+    CHANNEL_CANDIDATE="$PWD/out/pc-2/build/images/rootfs.squashfs"
+```
+
+O executor verifica a configuração de fábrica, seleciona um servidor alternativo, recusa a assinatura adulterada e instala a revisão 2 com `melkor-core-update`. Após reiniciar em B, a troca de canal permanece, a revisão instalada é reconhecida como atual e o reset restaura o endereço de fábrica. Os testes Go rejeitam também manifestos expirados, revisões anteriores, URLs HTTP e respostas maiores que o limite.
+
+Para publicar, gere o bundle com `make bundle-pc`, depois use `make channel-pc` com o mesmo `OUT`, `VERSION` e `KEYRING`. Em `BUNDLE_URL`, informe a URL HTTPS permanente do bundle versionado. Publique primeiro o bundle e depois `melkor-pc-channel.json` no endereço configurado na imagem, sob a tag `pc-stable`. Renove o manifesto antes da validade de 90 dias ou ajuste `CHANNEL_DAYS`. Use a chave privada do canal só no ambiente de assinatura.
+
 ### Contas locais do PC
 
 O gerador de discos virtuais aceita `PC_CREDENTIALS` como caminho para um arquivo regular de modo `0600` com duas linhas, `root:<hash>` e `melkor:<hash>`. Cada hash usa SHA-512 crypt, como na saída de `openssl passwd -6`. O build fornece `fakeroot` para que `mke2fs` grave os metadados de propriedade na imagem. O arquivo de hashes e as senhas descartáveis ficam fora do Git.

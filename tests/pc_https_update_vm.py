@@ -8,6 +8,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import os
 from pathlib import Path
 import re
+import runpy
+import shlex
 import shutil
 import ssl
 import subprocess
@@ -52,6 +54,10 @@ def fixtures(args, work):
     invalid = http / "invalid.raucb"
     invalid.write_bytes(data)
 
+    return http, BOOT["file_digest"](bundle), BOOT["file_digest"](invalid)
+
+
+def tls_seed(work):
     seed_files = work / "seed"
     seed_files.mkdir()
     tls_cert, tls_key = seed_files / "tls.pem", work / "tls.key"
@@ -63,7 +69,7 @@ def fixtures(args, work):
         stream.truncate(16 << 20)
     subprocess.run(["mke2fs", "-q", "-F", "-t", "ext4", "-m", "0", "-O", "^has_journal",
                     "-d", seed_files, seed], check=True)
-    return http, tls_cert, tls_key, seed, BOOT["file_digest"](bundle), BOOT["file_digest"](invalid)
+    return tls_cert, tls_key, seed
 
 
 def exercise(args, work):
@@ -81,7 +87,7 @@ def exercise(args, work):
         raise ValueError("QEMU_ACCEL deve ser auto, kvm ou tcg.")
     timeout = 120 if accel == "kvm" else 300
 
-    http, cert, key, seed, digest, invalid_digest = fixtures(args, work)
+    cert, key, seed = tls_seed(work)
     disk, variables = work / "disk.img", work / "OVMF_VARS.fd"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", "--", args.image, disk], check=True)
     shutil.copyfile(firmware_vars, variables)
@@ -89,6 +95,12 @@ def exercise(args, work):
     ca = "SSL_CERT_FILE=/run/seed/tls.pem"
     trusted = f"{ca} {update}"
     clean = 'set -- /persist/rauc/.download-*; test ! -e "$1"'
+
+    if args.channel_candidate is not None:
+        exercise_channel(args, work, disk, variables, code, seed, cert, key, timeout, accel, password)
+        return
+
+    http, digest, invalid_digest = fixtures(args, work)
 
     with https_server(http, cert, key) as url:
         bundle = f"{url}/update.raucb"
@@ -127,6 +139,56 @@ def exercise(args, work):
         guest(console, "sync")
 
 
+def exercise_channel(args, work, disk, variables, code, seed, cert, key, timeout, accel, password):
+    http = work / "http"
+    http.mkdir()
+    bundle = http / "update.raucb"
+    create_bundle(args.build / "host/bin/rauc", args.channel_candidate, args.cert, args.key, args.cert,
+                  "2.0-channel-test", bundle, compatible=BUNDLE["PC_COMPATIBLE"],
+                  slot_size=BUNDLE["PC_SLOT_SIZE"])
+    sign = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/channel-pc.py"))["sign"]
+    update = "melkor-core-update"
+    factory = "https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-channel.json"
+    with https_server(http, cert, key) as url:
+        document = sign(args.build, bundle, args.cert.resolve(), args.channel_key, f"{url}/update.raucb", 1)
+        (http / "channel.json").write_text(document)
+        (http / "invalid.json").write_text(document.replace('"signature": "', '"signature": "AAAA', 1))
+        with machine(work, "01-channel-a", disk, seed, code, variables, timeout, accel, network=True) as console:
+            BOOT["login"](console, b"root", password, rb"^[^\n]*# ")
+            slot(console, "A")
+            confirm(console, "A")
+            guest(console, "grep -Fx 1 /etc/melkor-update/revision")
+            guest(console, f"grep -Fx {shlex.quote(factory)} /etc/melkor-update/channel")
+            guest(console, "mkdir -p /run/seed && mount -t ext4 -o ro /dev/vdb /run/seed")
+            guest(console, "for attempt in $(seq 1 20); do "
+                  "ip -4 route show default | grep -q . && exit 0; sleep 1; done; exit 1")
+            state = grub_state(console)
+            guest(console, f"{update} --channel {url}/invalid.json")
+            result = guest(console, f"SSL_CERT_FILE=/run/seed/tls.pem {update}", allowed=(1,))
+            assert b"assinatura do canal" in result
+            assert grub_state(console) == state
+            guest(console, f"{update} --channel {url}/channel.json")
+            guest(console, f"SSL_CERT_FILE=/run/seed/tls.pem {update}")
+            assert grub_state(console)[b"ORDER"] == b"B A"
+            guest(console, "sync")
+
+        with machine(work, "02-channel-b", disk, seed, code, variables, timeout, accel, network=True) as console:
+            BOOT["login"](console, b"root", password, rb"^[^\n]*# ")
+            slot(console, "B")
+            confirm(console, "B")
+            guest(console, "grep -Fx 2 /etc/melkor-update/revision")
+            guest(console, f"grep -Fx {url}/channel.json /persist/rauc/channel")
+            guest(console, "mkdir -p /run/seed && mount -t ext4 -o ro /dev/vdb /run/seed")
+            guest(console, "for attempt in $(seq 1 20); do "
+                  "ip -4 route show default | grep -q . && exit 0; sleep 1; done; exit 1")
+            state = grub_state(console)
+            result = guest(console, f"SSL_CERT_FILE=/run/seed/tls.pem {update}")
+            assert b"atualizado." in result
+            assert grub_state(console) == state
+            guest(console, f"{update} --reset-channel && test ! -e /persist/rauc/channel")
+            guest(console, f"grep -Fx {shlex.quote(factory)} /etc/melkor-update/channel")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("build", type=Path)
@@ -135,12 +197,19 @@ def main():
     parser.add_argument("--key", type=Path, required=True)
     parser.add_argument("--root-password-file", type=Path, required=True)
     parser.add_argument("--log-dir", type=Path, required=True)
+    parser.add_argument("--channel-key", type=Path)
+    parser.add_argument("--channel-candidate", type=Path)
     args = parser.parse_args()
+    if bool(args.channel_candidate) != bool(args.channel_key):
+        parser.error("Informe --channel-key e --channel-candidate juntos.")
     args.log_dir.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="https-", dir=args.log_dir.resolve()))
     print(f"Evidências em {work}", flush=True)
     exercise(args, work)
-    print("TLS, SHA-256, assinatura RAUC, promoção A → B e persistência verificados.")
+    if args.channel_candidate is not None:
+        print("Canal padrão, substituição, assinatura, promoção A → B e restauração verificados.")
+    else:
+        print("TLS, SHA-256, assinatura RAUC, promoção A → B e persistência verificados.")
 
 
 if __name__ == "__main__":

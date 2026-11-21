@@ -12,7 +12,7 @@ BUILD_ENV ?= distrobox enter -n melkor-build --
 endif
 endif
 
-.PHONY: env check-env image installer-iso test-installer test-boot check-m1 bundle-m1 bundle-pc test-update test-update-https test-dns test-live-wifi tools test test-packages pc-disk test-pc-disk test-pc-desktop
+.PHONY: env check-env image installer-iso test-installer test-boot check-m1 bundle-m1 bundle-pc channel-pc test-update test-update-https test-channel-pc test-dns test-live-wifi tools test test-packages pc-disk test-pc-disk test-pc-desktop
 env:
 	./scripts/prepare-env.sh prepare "$(BOARD)"
 
@@ -20,7 +20,9 @@ check-env:
 	./scripts/prepare-env.sh --check "$(BOARD)"
 
 image:
-	$(BUILD_ENV) env MELKOR_RAUC_KEYRING="$(MELKOR_RAUC_KEYRING)" MELKOR_LAB_ROOT_HASH_FILE="$(MELKOR_LAB_ROOT_HASH_FILE)" ./scripts/build-image.sh "$(OUT)" "$(BOARD)"
+	$(BUILD_ENV) env MELKOR_RAUC_KEYRING="$(MELKOR_RAUC_KEYRING)" MELKOR_LAB_ROOT_HASH_FILE="$(MELKOR_LAB_ROOT_HASH_FILE)" \
+		MELKOR_CHANNEL_PUBLIC_KEY="$(MELKOR_CHANNEL_PUBLIC_KEY)" MELKOR_CORE_REVISION="$(MELKOR_CORE_REVISION)" \
+		./scripts/build-image.sh "$(OUT)" "$(BOARD)"
 
 installer-iso: BOARD = installer
 installer-iso:
@@ -50,6 +52,12 @@ bundle-pc:
 	$(BUILD_ENV) python3 scripts/bundle-m1.py "$(OUT)/build" --pc --cert "$(CERT)" --key "$(KEY)" \
 		--keyring "$(KEYRING)" --version "$(VERSION)" --output "$(OUT)/melkor-pc-$(VERSION).raucb"
 
+channel-pc: BOARD = pc
+channel-pc:
+	$(BUILD_ENV) python3 scripts/channel-pc.py "$(OUT)/build" "$(OUT)/melkor-pc-$(VERSION).raucb" \
+		--keyring "$(KEYRING)" --key "$(CHANNEL_KEY)" --url "$(BUNDLE_URL)" \
+		--days "$(or $(CHANNEL_DAYS),90)" --output "$(OUT)/melkor-pc-channel.json"
+
 test-update: BOARD = m1
 test-update:
 	$(BUILD_ENV) python3 tests/m1_update_vm.py "$(OUT)/build" --cert "$(CERT)" --key "$(KEY)" \
@@ -61,6 +69,12 @@ test-update-https:
 	$(BUILD_ENV) python3 tests/pc_https_update_vm.py "$(OUT)/build" "$(OUT)/melkor-pc.img" \
 		--cert "$(CERT)" --key "$(KEY)" --root-password-file "$(ROOT_PASSWORD_FILE)" \
 		--log-dir "$(OUT)/https-tests"
+
+test-channel-pc: BOARD = pc
+test-channel-pc:
+	$(BUILD_ENV) python3 tests/pc_https_update_vm.py "$(OUT)/build" "$(OUT)/melkor-pc.img" \
+		--cert "$(CERT)" --key "$(KEY)" --root-password-file "$(ROOT_PASSWORD_FILE)" \
+		--log-dir "$(OUT)/channel-tests" --channel-key "$(CHANNEL_KEY)" --channel-candidate "$(CHANNEL_CANDIDATE)"
 
 test-dns: BOARD = m1
 test-dns:

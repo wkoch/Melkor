@@ -239,6 +239,28 @@ source "$1"
             self.run_script(board / "m1/post-build.sh", target, code=1, MELKOR_LAB_ROOT_HASH_FILE=hash_file, **env)
         self.assertIn(password_hash, shadow.read_text())
 
+    def test_pc_embute_revisao_e_chave_publica_do_canal(self):
+        script = self.project / "core/board/pc/post-build.sh"
+        target = self.out / "target"
+        config = target / "etc/melkor-update"
+        config.mkdir(parents=True)
+        host = self.out / "host"
+        (host / "bin").mkdir(parents=True)
+        openssl = host / "bin/openssl"
+        openssl.write_text("#!/bin/sh\nif [ \"$5\" = -text_pub ]; then "
+                           "printf '%s\\n' 'ED25519 Public-Key:'; else cp \"$4\" \"$7\"; fi\n")
+        openssl.chmod(0o755)
+        key = self.out / "channel.pem"
+        key.write_text("chave de teste")
+        self.run_script(script, target, HOST_DIR=host)
+        self.assertEqual((config / "revision").read_text(), "0\n")
+        for revision in ("-1", "01", "4294967296", "1"):
+            self.run_script(script, target, code=1, MELKOR_CORE_REVISION=revision, HOST_DIR=host)
+        self.run_script(script, target, MELKOR_CORE_REVISION="1", HOST_DIR=host,
+                        MELKOR_RAUC_KEYRING=key, MELKOR_CHANNEL_PUBLIC_KEY=key)
+        self.assertEqual((config / "revision").read_text(), "1\n")
+        self.assertEqual((config / "channel.pem").read_text(), "chave de teste")
+
     def test_init_live_exige_devs_em_memoria_antes_de_iniciar_dinit(self):
         init = self.project / "core/board/live/rootfs-overlay/init"
         self.run_script(self.boot, init, code=1, TEST_MOUNT_CODE="1")
@@ -338,6 +360,16 @@ source "$1"
         self.run_script(self.update, update, "--https", url, digest, TEST_CORE_FETCH="yes", TEST_UID="0")
         self.assertEqual(self.boot_log.read_text(), f"/usr/bin/flock --nonblock /run/melkor/rauc.lock "
                                                    f"/usr/bin/melkor-core-fetch {url} {digest}\n")
+
+    def test_canal_do_pc_exige_root_e_usa_a_trava(self):
+        update = self.project / "core/board/m1/rootfs-overlay/usr/sbin/melkor-core-update"
+        source = "https://example.invalid/channel.json"
+        for args in ((), ("--channel", source), ("--reset-channel",)):
+            self.run_script(self.update, update, *args, code=1, TEST_UID="1000", TEST_CORE_FETCH="yes")
+            self.run_script(self.update, update, *args, TEST_UID="0", TEST_CORE_FETCH="yes")
+        prefix = "/usr/bin/flock --nonblock /run/melkor/rauc.lock /usr/bin/melkor-core-fetch"
+        self.assertEqual(self.boot_log.read_text().splitlines(),
+                         [prefix, f"{prefix} --channel {source}", f"{prefix} --reset-channel"])
 
     def test_boot_monta_alvos_e_interrompe_em_falha(self):
         board = self.project / "core/board"

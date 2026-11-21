@@ -15,10 +15,10 @@ func TrustedSource(addr *url.URL) bool {
 	return addr.Scheme == "https" && addr.Hostname() != "" && addr.User == nil
 }
 
-func File(ctx context.Context, transport http.RoundTripper, source, digest, file string, limit int64) error {
+func open(ctx context.Context, transport http.RoundTripper, source string, limit int64) (io.ReadCloser, error) {
 	addr, err := url.Parse(source)
 	if err != nil || !TrustedSource(addr) {
-		return fmt.Errorf("fonte inválida: informe HTTPS sem credenciais")
+		return nil, fmt.Errorf("fonte inválida: informe HTTPS sem credenciais")
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -32,25 +32,48 @@ func File(ctx context.Context, transport http.RoundTripper, source, digest, file
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr.String(), nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("baixar %s: HTTP %d", source, resp.StatusCode)
+		resp.Body.Close()
+		return nil, fmt.Errorf("baixar %s: HTTP %d", source, resp.StatusCode)
 	}
 	if resp.ContentLength > limit {
-		return fmt.Errorf("fonte excede o limite de %d bytes", limit)
+		resp.Body.Close()
+		return nil, fmt.Errorf("fonte excede o limite de %d bytes", limit)
 	}
+	return resp.Body, nil
+}
+
+func Small(ctx context.Context, transport http.RoundTripper, source string, limit int64) ([]byte, error) {
+	body, err := open(ctx, transport, source, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+	data, err := io.ReadAll(io.LimitReader(body, limit+1))
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("fonte excede o limite de %d bytes", limit)
+	}
+	return data, err
+}
+
+func File(ctx context.Context, transport http.RoundTripper, source, digest, file string, limit int64) error {
+	body, err := open(ctx, transport, source, limit)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
 	out, err := os.Create(file)
 	if err != nil {
 		return err
 	}
 	hash := sha256.New()
-	written, err := io.Copy(io.MultiWriter(out, hash), io.LimitReader(resp.Body, limit+1))
+	written, err := io.Copy(io.MultiWriter(out, hash), io.LimitReader(body, limit+1))
 	if closeErr := out.Close(); err == nil {
 		err = closeErr
 	}

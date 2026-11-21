@@ -201,6 +201,8 @@ Com KVM, `make test-update-https OUT=out/pc-https CERT=… KEY=… ROOT_PASSWORD
 
 `make test` passou com 41 testes Python e cobertura de 80,2% em Go, 92,4% em Python e 96,4% em Shell. O teste usou certificados descartáveis e o canal público de bundles assinados segue pendente.
 
+O Buildroot gerou os SquashFS das revisões de laboratório 1 e 2, com a URL estável da fábrica e a chave Ed25519 pública de teste. `make channel-pc` extraiu o bundle RAUC verificado e assinou o manifesto com a revisão 2. Em QEMU com KVM, `make test-channel-pc OUT=out/pc-channel-lab …` provou a recusa de assinatura alterada, a instalação pela chamada sem argumentos e o boot em B. A seleção de canal persistiu, a mesma revisão foi reconhecida como atual e o reset restaurou a configuração de fábrica. `make test` passou com 45 testes Python e cobertura de 80,1% em Go, 92,4% em Python e 96,7% em Shell. Os registros estão em `out/pc-channel-lab/`. [Procedimento](TESTES.md#canal-de-atualizações-do-pc)
+
 ### Instalação offline pela ISO
 
 A mídia dedicada empacota o core PC e prepara uma GPT pelo tamanho e pelo setor lógico do disco selecionado. O fluxo pede confirmação pelo ID estável e provisiona as duas contas antes de abrir o destino para gravação. A ISO foi validada com o NVMe que recebe o sistema e outro NVMe gravável. Os testes comparam os hashes do vizinho e iniciam os dois slots com a mídia removida. A instalação física no HP, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam pendentes.
