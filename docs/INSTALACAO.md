@@ -21,11 +21,17 @@ Na unidade de referência, a placa Wi-Fi é uma Intel AX200 (`8086:2723`). Quand
 dmesg | grep -Ei 'iwlwifi|iwlmvm|01:00[.]0|rfkill|regulatory'
 ```
 
-## Instalação de disco inteiro em laboratório
+## Instalação da base no disco inteiro
 
-O alvo `installer` prepara o disco sem rede. A opção **Instalar Melkor** abre o console local dedicado. A tela exibe modelo, capacidade, setor lógico e ID persistente dos discos elegíveis. A confirmação `APAGAR <ID>` autoriza apagar todas as partições do disco escolhido. Depois dela, o instalador pede e confirma a senha do usuário `melkor` e uma senha distinta para root.
+Inicie a ISO mínima pelo Ventoy e escolha **Instalar Melkor**. A lista mostra um número, modelo, capacidade e setor lógico para cada disco interno elegível. Digite o número do disco e confira o modelo e a capacidade repetidos na confirmação. Digite `APAGAR` somente se você tiver cópia dos dados e quiser apagar todas as partições daquele disco. Defina senhas distintas para `root` e `melkor`.
 
-Ao concluir, reinicie sem a mídia e entre com a conta comum. Use `su -` para entrar na sessão administrativa. O teste atual cobre o provisionamento no NVMe virtual e a sessão provisória Weston. A instalação no HP e o perfil final de aplicativos fazem parte da validação da release.
+Ao concluir, reinicie sem a mídia e entre como `melkor`. A base abre no console e permite configurar Wi-Fi com `iwctl`.
+
+### Instalar o desktop depois
+
+Copie o arquivo local assinado `melkor-desktop.raucb` para um pendrive FAT32 com rótulo `MELKOR_APPS`. Após iniciar pelo SSD, conecte o pendrive e execute `su -` com a senha de root. Em seguida, rode `melkor-finalizar`. Se a partição de dados do Ventoy já estiver em FAT32 e tiver rótulo `Ventoy`, use a mesma mídia com `melkor-finalizar Ventoy`. O comando aceita o rótulo da mídia como argumento.
+
+Aguarde o RAUC concluir com sucesso e reinicie. O RAUC grava o desktop no slot inativo e preserva o volume com os dados, as senhas e a configuração do Wi-Fi. No próximo boot, o login gráfico abre Umbriel e Noctalia. O bundle inclui Alacritty, Nushell, Firefox ESR, Brave Origin e Blanc.
 
 ## Decisões
 
@@ -41,7 +47,7 @@ Ao concluir, reinicie sem a mídia e entre com a conta comum. Use `su -` para en
 
 A atualização do core trabalha com a GPT existente e preserva o volume que contém os dados e o swap. O instalador gera identificadores próprios para cada máquina. Uma instalação completa e uma atualização A/B têm caminhos e testes distintos.
 
-O perfil inicial dos navegadores deve estar pronto no primeiro login. A mídia padrão pode levar o perfil já compilado ou obtê-lo como artefato assinado durante a instalação. A compilação local segue sendo uma opção para quem quiser alterar as receitas.
+O perfil inicial dos navegadores está disponível no primeiro login gráfico após a aplicação do bundle. A compilação local segue sendo uma opção para quem quiser alterar as receitas.
 
 ### DNS do sistema
 

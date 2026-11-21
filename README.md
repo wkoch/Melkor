@@ -6,13 +6,13 @@ O marco M0 entrega uma imagem x86-64 que inicia por UEFI e chega ao console seri
 
 ## Testar a primeira prévia
 
-O [Melkor PC Core](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.4-core) instala por UEFI o core de console com Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. A release inclui a ISO para Ventoy, o bundle RAUC assinado, os checksums e as fontes usadas no build.
+O fluxo padrão começa com o PC Core por UEFI, com console, Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. O instalador atualizado usa o número do SSD e a confirmação `APAGAR`. Depois de iniciar pelo SSD, aplique o bundle assinado do desktop. [Instalação em duas etapas](docs/INSTALACAO.md#instalação-da-base-no-disco-inteiro) · [Primeira release pública do PC Core](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.4-core)
 
 Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot serial. A prévia inclui dinit, slots A/B, armazenamento persistente e DNS do sistema via Quad9 DoH. A release também oferece o CLI de aplicativos para o host Linux x86-64. A instalação em computador físico faz parte do M4. [Melkor v0.1.0-alpha.1](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
 
 Para conferir o HP ProBook x360 435 G7, use a ISO **Melkor Live** com Ventoy. Ela roda em RAM e abre um console local para conferir tela, teclado e a detecção de dispositivos. [Teste de hardware pelo pendrive](docs/INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 
-Após instalar a edição completa, retire a mídia e reinicie. A tela de login gráfico abre automaticamente. Entre como `melkor` com a senha que você definiu no instalador para iniciar Umbriel com Noctalia. Ao encerrar a sessão, a tela de login volta. Nessa tela, `Ctrl+Alt+F2` abre o console de recuperação. A ISO pública PC Core inicia pelo console.
+Após aplicar o bundle do desktop e reiniciar, a tela de login gráfico abre automaticamente. Entre como `melkor` com a senha que você definiu no instalador para iniciar Umbriel com Noctalia. Ao encerrar a sessão, a tela de login volta. Nessa tela, `Ctrl+Alt+F2` abre o console de recuperação.
 
 Use `Super+Enter` para abrir Alacritty com Nushell. O Firefox ESR abre links HTTP e HTTPS por padrão. O lançador também inclui Brave Origin e Blanc. Os três navegadores reproduzem áudio pelo PipeWire da sessão. [Evidências do perfil](docs/TESTES.md#perfil-de-aplicativos-do-pc)
 
@@ -66,9 +66,9 @@ O host Bazzite é imutável e não tem `sudo` sem senha. As ferramentas de build
 | `make test-boot BOARD=live` | Imagem Live, QEMU, OVMF, `sfdisk` e `mke2fs` | Inicia pelo USB virtual e confere o login, o framebuffer e a integridade do NVMe virtual. |
 | `make test-live-wifi HWSIM=…` | Build Live, QEMU, `cpio` e módulo `mac80211_hwsim.ko` compilado para o mesmo kernel | Exercita a associação WPA2 pelo usuário comum, sem usar a rede do host. [Preparação do módulo](docs/TESTES.md#associação-wi-fi-em-qemu) |
 | `make env BOARD=pc` e `make image BOARD=pc` | Contêiner de build, cache de fontes e saída própria para o alvo PC | Gera o core, o kernel e o bootloader do protótipo PC. |
-| `make image BOARD=pc MELKOR_PC_MINIMAL=1 OUT=out/pc-minimal` | Ambiente PC preparado e diretório de saída novo | Gera o core para o instalador público, com console, Wi-Fi, Ethernet, Quad9 DoH e RAUC. |
+| `make image BOARD=pc OUT=out/pc-minimal` | Ambiente PC preparado e diretório de saída novo | Gera o core mínimo com console, Wi-Fi, Ethernet, Quad9 DoH e RAUC. As camadas de desktop selecionam a edição completa. |
 | `make env BOARD=installer` e `make image BOARD=installer` | Contêiner de build, cache preparado e saída nova | Gera o kernel e o initramfs da mídia dedicada de instalação. |
-| `make installer-iso PC_OUT=out/pc` e `make test-installer` | Builds do PC e do instalador, `cpio`, `dosfstools`, QEMU e OVMF | Empacota o core na ISO e testa a instalação sem rede em um NVMe virtual. `TEST_SECTOR_SIZE=4096` testa 4Kn. Na ISO completa, `TEST_VM_MEMORY=8192 PC_DESKTOP_LOGIN=1` testa o login com a senha provisionada. [Validação do instalador](docs/TESTES.md#instalação-de-disco-inteiro) |
+| `make installer-iso PC_OUT=out/pc` e `make test-installer` | Builds do PC e do instalador, `cpio`, `dosfstools`, QEMU e OVMF | Empacota o core na ISO e testa a instalação sem rede em um NVMe virtual. `TEST_SECTOR_SIZE=4096` testa 4Kn. `PC_DESKTOP_BUNDLE=…` aplica o desktop após instalar a base e testa o login. [Validação do instalador](docs/TESTES.md#instalação-de-disco-inteiro) |
 | `make pc-disk` e `make test-pc-disk` | Build PC, Go, `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools`, QEMU e OVMF | Cria um arquivo de disco de laboratório e inicia seus dois slots por NVMe virtual. `PC_DISK_GIB` ajusta os 16 GiB iniciais. |
 | `make pc-disk PC_CREDENTIALS=…` | Build PC, `fakeroot` do Buildroot e arquivo privado de hashes | Registra senhas separadas de root e do usuário comum nos dados persistentes. [Validação das contas](docs/TESTES.md#contas-locais-do-pc) |
 | `make test-pc-desktop` | Disco virtual PC, QEMU e OVMF | Exercita o login local e o terminal Wayland. `PC_DESKTOP_LOGIN=1` seleciona o teste do login gráfico com Umbriel. `PC_DESKTOP_AUDIO=1` exercita a placa HDA virtual com `PC_DESKTOP_APPS=1`, a camada de aplicativos e o driver WAV do QEMU. |

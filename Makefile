@@ -8,6 +8,12 @@ PC_DESKTOP_LAYER ?= out/pc-desktop.layer.tar.gz
 PC_CHROMIUM_LAYER ?= out/pc-chromium.layer.tar.gz
 PC_SESSION_LAYER ?= out/pc-session.layer.tar.gz
 
+ifeq ($(BOARD),pc)
+ifeq ($(strip $(MELKOR_PC_DESKTOP_LAYER) $(MELKOR_PC_CHROMIUM_LAYER) $(MELKOR_PC_SESSION_LAYER)),)
+MELKOR_PC_MINIMAL ?= 1
+endif
+endif
+
 # No host Bazzite, as ferramentas de build e de teste ficam no contêiner melkor-build.
 # No CI, sem distrobox, os comandos rodam diretamente.
 ifeq ($(wildcard /run/.containerenv),)
@@ -50,7 +56,8 @@ test-installer: BOARD = installer
 test-installer:
 	$(BUILD_ENV) python3 tests/installer_vm.py "$(OUT)/melkor-installer.iso" --log-dir "$(OUT)/tests" \
 		$(if $(TEST_SECTOR_SIZE),--sector-size "$(TEST_SECTOR_SIZE)") $(if $(TEST_VM_MEMORY),--memory-mib "$(TEST_VM_MEMORY)") \
-		$(if $(filter 1,$(PC_DESKTOP_LOGIN)),--graphical-login)
+		$(if $(filter 1,$(PC_DESKTOP_LOGIN)),--graphical-login) \
+		$(if $(PC_DESKTOP_BUNDLE),--desktop-bundle "$(PC_DESKTOP_BUNDLE)")
 
 test-boot:
 	$(BUILD_ENV) python3 scripts/test-boot.py "$(if $(filter pc,$(BOARD)),$(OUT)/melkor-pc.img,$(OUT)/build/images/melkor-$(BOARD).img)" --log-dir "$(OUT)/tests" \

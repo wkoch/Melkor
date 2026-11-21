@@ -396,6 +396,55 @@ source "$1"
             ])
             self.assertEqual(list(self.out.iterdir()), [self.downloads])
 
+    def test_finaliza_pc_com_midia_somente_leitura_e_limpa_area_temporaria(self):
+        wrapper = self.wrapper("finalizar", '''
+id() { printf '%s\\n' "$TEST_UID"; }
+blkid() {
+    printf 'blkid %s\\n' "$*" >> "$TEST_BOOT_LOG"
+    case "$TEST_MEDIA" in
+        no) return 2 ;;
+        multiple) printf '/dev/usb1\\n/dev/usb2\\n' ;;
+        *) printf '/dev/usb1\\n' ;;
+    esac
+}
+test() {
+    if [[ $1 = -b ]]; then [[ $2 = /dev/usb1 ]]; else builtin test "$@"; fi
+}
+mktemp() { command mktemp -d "$TEST_FINALIZAR/XXXXXX"; }
+mount() {
+    printf 'mount %s\\n' "$*" >> "$TEST_BOOT_LOG"
+    if [[ $TEST_BUNDLE = yes ]]; then printf 'bundle' > "${@: -1}/melkor-desktop.raucb"; fi
+}
+umount() {
+    printf 'umount\\n' >> "$TEST_BOOT_LOG"
+    rm -f "$1/melkor-desktop.raucb"
+}
+melkor-core-update() {
+    builtin test "$(stat -c %a "$1")" = 600
+    printf 'update %s\\n' "$(cat "$1")" >> "$TEST_BOOT_LOG"
+    return "$TEST_UPDATE_CODE"
+}
+script=$1
+shift
+source "$script" "$@"
+''')
+        script = self.project / "core/board/pc/rootfs-overlay/usr/bin/melkor-finalizar"
+        env = dict(TEST_UID="0", TEST_MEDIA="yes", TEST_FINALIZAR=self.out,
+                   TEST_BUNDLE="yes", TEST_UPDATE_CODE="0")
+        self.run_script(wrapper, script, code=2, **(env | {"TEST_UID": "1000"}))
+        self.run_script(wrapper, script, "Ventoy", "extra", code=2, **env)
+        for invalid in ("no", "multiple"):
+            self.run_script(wrapper, script, code=1, **(env | {"TEST_MEDIA": invalid}))
+        for status, options in ((1, {"TEST_BUNDLE": "no"}), (42, {"TEST_UPDATE_CODE": "42"}), (0, {})):
+            self.boot_log.write_text("")
+            self.run_script(wrapper, script, "Ventoy", code=status, **(env | options))
+            self.assertEqual(list(self.out.iterdir()), [self.downloads])
+            observed = self.boot_log.read_text()
+            self.assertIn("blkid -t LABEL=Ventoy -o device", observed)
+            self.assertIn("mount -t vfat -o ro,nosuid,nodev,noexec /dev/usb1", observed)
+            self.assertIn("umount\n", observed)
+            self.assertEqual("update bundle" in observed, status != 1)
+
     def test_lancadores_pc_preservam_shell_e_isolam_o_navegador(self):
         binaries = self.project / "core/board/pc/rootfs-overlay/usr/bin"
         self.run_script(self.app, binaries / "melkor-terminal")

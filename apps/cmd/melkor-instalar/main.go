@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"unicode"
@@ -26,27 +27,27 @@ func selectDisk(in *bufio.Reader, out io.Writer, disks []pcdisk.Disk) (pcdisk.Di
 		return pcdisk.Disk{}, fmt.Errorf("nenhum disco interno elegível encontrado")
 	}
 	fmt.Fprintln(out, "A instalação apagará todas as partições do disco escolhido.")
-	for _, disk := range disks {
-		fmt.Fprintf(out, "%s (%q, %.1f GiB, setor de %d bytes)\n", disk.ID, disk.Model, float64(disk.Bytes)/pcdisk.GiB, disk.Sector)
+	for i, disk := range disks {
+		fmt.Fprintf(out, "%d. %q, %.1f GiB, setor de %d bytes\n", i+1, disk.Model, float64(disk.Bytes)/pcdisk.GiB, disk.Sector)
 	}
-	id, err := line(in, out, "ID do disco: ")
+	choice, err := line(in, out, "Número do disco: ")
 	if err != nil {
 		return pcdisk.Disk{}, err
 	}
-	for _, disk := range disks {
-		if disk.ID == id {
-			token := "APAGAR " + disk.ID
-			confirmation, err := line(in, out, "Digite "+token+" para confirmar: ")
-			if err != nil {
-				return pcdisk.Disk{}, err
-			}
-			if confirmation != token {
-				return pcdisk.Disk{}, fmt.Errorf("instalação cancelada")
-			}
-			return disk, nil
-		}
+	number, err := strconv.Atoi(choice)
+	if err != nil || number < 1 || number > len(disks) {
+		return pcdisk.Disk{}, fmt.Errorf("número ausente na lista de discos")
 	}
-	return pcdisk.Disk{}, fmt.Errorf("ID ausente na lista de discos")
+	disk := disks[number-1]
+	fmt.Fprintf(out, "Disco %d selecionado: %q, %.1f GiB (%s).\n", number, disk.Model, float64(disk.Bytes)/pcdisk.GiB, disk.ID)
+	confirmation, err := line(in, out, "Digite APAGAR para confirmar: ")
+	if err != nil {
+		return pcdisk.Disk{}, err
+	}
+	if confirmation != "APAGAR" {
+		return pcdisk.Disk{}, fmt.Errorf("instalação cancelada")
+	}
+	return disk, nil
 }
 
 func readPassword(in *bufio.Reader, out io.Writer, account string) (string, error) {

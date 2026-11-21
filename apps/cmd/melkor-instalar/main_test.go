@@ -11,17 +11,24 @@ import (
 	"melkor.local/apps/internal/pcdisk"
 )
 
-func TestSelecionaSomenteDiscoConfirmadoPeloID(t *testing.T) {
+func TestSelecionaSomenteDiscoConfirmadoPeloNumero(t *testing.T) {
 	disks := []pcdisk.Disk{{ID: "nvme-segundo", Bytes: 13 * pcdisk.GiB, Sector: 512},
 		{ID: "nvme-principal", Model: "SSD", Bytes: 16 * pcdisk.GiB, Sector: 512}}
 	for _, test := range []struct {
 		input string
 		want  string
 	}{
-		{"nvme-principal\nAPAGAR nvme-principal\n", "nvme-principal"},
-		{"nvme-segundo\nAPAGAR nvme-principal\n", ""},
+		{"2\nAPAGAR\n", "nvme-principal"},
+		{"1\r\nAPAGAR\r\n", "nvme-segundo"},
+		{"1\nAPAGAR 2\n", ""},
+		{"1\n\n", ""},
+		{"\nAPAGAR\n", ""},
+		{"0\nAPAGAR\n", ""},
+		{"-1\nAPAGAR\n", ""},
+		{"3\nAPAGAR\n", ""},
 		{"desconhecido\n", ""},
-		{"nvme-principal\n", ""},
+		{"2\n", ""},
+		{"2\nAPAGAR", ""},
 		{"", ""},
 	} {
 		var output bytes.Buffer
@@ -31,6 +38,10 @@ func TestSelecionaSomenteDiscoConfirmadoPeloID(t *testing.T) {
 		}
 		if !strings.Contains(output.String(), "todas as partições") || !strings.Contains(output.String(), "16.0 GiB") {
 			t.Fatal("a seleção precisa informar o efeito e a capacidade")
+		}
+		if test.want != "" && (!strings.Contains(output.String(), test.want) ||
+			!strings.Contains(output.String(), "Digite APAGAR para confirmar: ")) {
+			t.Fatal("a confirmação precisa identificar a unidade selecionada")
 		}
 	}
 	if _, err := selectDisk(bufio.NewReader(strings.NewReader("")), io.Discard, nil); err == nil {
