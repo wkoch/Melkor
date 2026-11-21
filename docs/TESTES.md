@@ -104,10 +104,14 @@ make image BOARD=pc OUT=out/pc-apps \
   MELKOR_PC_SESSION_LAYER="$PWD/out/pc-session.layer.tar.gz"
 make pc-disk OUT=out/pc-apps
 make test-pc-desktop OUT=out/pc-apps PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 \
-  PC_DESKTOP_UMBRIEL=1 PC_DESKTOP_AUDIO=1
+  PC_DESKTOP_LOGIN=1 PC_DESKTOP_AUDIO=1
 ```
 
-O executor inicia o compositor, verifica que Noctalia foi aberta pela sessão, aciona o terminal e executa a expressão `[1 2 3] | math sum` com Nushell. O GIO confirma as associações HTTP e HTTPS e o Firefox renderiza uma página local. Nos navegadores Chromium a prova exige um processo de renderização com filtro seccomp. Com `PC_DESKTOP_AUDIO=1`, o QEMU fornece uma placa HDA e grava a saída em WAV. O teste verifica que o Pulse rejeita a criação de um fluxo de captura e o carregamento de módulos, que cada navegador cria um fluxo de reprodução e que o WAV contém amostras de áudio. Os perfis descartáveis pulam as telas de boas-vindas dos navegadores para tocar o tom. O Blanc recebe a página por HTTP no loopback da VM, pois seu encaminhamento de URLs aceita HTTP e HTTPS. Os logs seriais e as capturas ficam em `OUT/desktop-tests/`. O plano de instalação com todos os aplicativos usa `make test-installer TEST_VM_MEMORY=8192`, porque os dois slots e a imagem temporária ocupam RAM durante a gravação.
+O executor usa QMP para confirmar a troca para o console de recuperação e testar a tela de login. Ele verifica a recusa de uma senha incorreta e da conta root, entra como `melkor` e confere o UID da sessão e o socket de Noctalia. Ao encerrar Umbriel, ele aguarda o retorno da tela de login. A execução com a ISO usa `make test-installer OUT=out/installer TEST_VM_MEMORY=8192 PC_DESKTOP_LOGIN=1`. Ela valida o login gráfico com uma senha aleatória de 128 bytes provisionada pelo próprio instalador e inicia os dois slots sem a mídia. O caso gráfico usa disco virtual com setor lógico de 512 bytes.
+
+O executor aciona o terminal e executa a expressão `[1 2 3] | math sum` com Nushell. O GIO confirma as associações HTTP e HTTPS e o Firefox renderiza uma página local. Nos navegadores Chromium a prova exige um processo de renderização com filtro seccomp. Com `PC_DESKTOP_AUDIO=1`, o QEMU fornece uma placa HDA e grava a saída em WAV. O teste verifica que o Pulse rejeita a criação de um fluxo de captura e o carregamento de módulos, que cada navegador cria um fluxo de reprodução e que o WAV contém amostras de áudio. Os perfis descartáveis pulam as telas de boas-vindas dos navegadores para tocar o tom. O Blanc recebe a página por HTTP no loopback da VM, pois seu encaminhamento de URLs aceita HTTP e HTTPS. Os logs seriais e as capturas ficam em `OUT/desktop-tests/` ou na pasta `desktop/` do teste do instalador.
+
+O runtime usa os APKs do Cage 0.3.0-r0 e do greetd 0.10.3-r11 do Alpine 3.24. O SDK descartável adiciona os cabeçalhos do GTK 3 e do json-c para compilar gtkgreet 0.8. A fonte do gtkgreet e os APKs estão fixados nos locks. O patch do Melkor mantém o comando de abertura de Umbriel fixo, remove as decorações da janela em modo quiosque e aceita toda a faixa de senhas permitida pelo instalador. O patchelf do Buildroot entra no host de build e ajusta o interpretador do greetd e do auxiliar `unix_chkpwd` do Linux-PAM. Somente root pode executar o auxiliar no sistema instalado.
 
 ## Download HTTPS de atualizações do PC
 

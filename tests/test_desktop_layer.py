@@ -53,9 +53,16 @@ class DesktopLayerTest(unittest.TestCase):
                 self.assertIn("--no-network", args[-1])
                 stage = Path(next(arg for arg in args if arg.endswith(":/work")).removesuffix(":/work"))
                 self.assertEqual((stage / "packages/pacote.apk").read_bytes(), payload)
+                greeter_patch = stage / "packages/gtkgreet-login.patch"
+                if "build-gtkgreet" in args[-1]:
+                    self.assertEqual(greeter_patch.read_bytes(), LAYER["GREETER_PATCH"].read_bytes())
+                else:
+                    self.assertFalse(greeter_patch.exists())
                 (stage / "layer.tar.gz").write_bytes(b"layer")
 
             assemble = LAYER["assemble"]
-            with patch.dict(assemble.__globals__, {"LOCK": lock}), patch.object(subprocess, "run", side_effect=install):
-                assemble(cache, output)
-            self.assertEqual(output.read_bytes(), b"layer")
+            with patch.dict(assemble.__globals__, {"LOCK": lock, "SDK_LOCK": lock}), \
+                    patch.object(subprocess, "run", side_effect=install):
+                for profile in ("alpine", "session"):
+                    assemble(cache, output, profile)
+                    self.assertEqual(output.read_bytes(), b"layer")

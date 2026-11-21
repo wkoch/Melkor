@@ -3,7 +3,7 @@ set -eu
 
 runtime=/opt/melkor-desktop
 case "${1:-}" in
-    umbriel|noctalia|pipewire|pipewire-pulse|wireplumber|wpctl|pactl|paplay|parec)
+    cage|gtkgreet|umbriel|noctalia|pipewire|pipewire-pulse|wireplumber|wpctl|pactl|paplay|parec)
         program="$runtime/usr/bin/$1"
         ;;
     *) exit 2 ;;

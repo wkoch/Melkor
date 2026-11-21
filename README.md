@@ -12,7 +12,9 @@ Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot s
 
 Para conferir o HP ProBook x360 435 G7, use a ISO **Melkor Live** com Ventoy. Ela roda em RAM e abre um console local para conferir tela, teclado e a detecção de dispositivos. [Teste de hardware pelo pendrive](docs/INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 
-Na prévia do instalador com aplicativos, entre com a conta comum e execute `melkor-desktop` para iniciar Umbriel com Noctalia. Use `Super+Enter` para abrir Alacritty com Nushell. O Firefox ESR abre links HTTP e HTTPS por padrão. O lançador também inclui Brave Origin e Blanc. Os três navegadores reproduzem áudio pelo PipeWire da sessão. `melkor-desktop --weston` abre a sessão alternativa. [Evidências do perfil](docs/TESTES.md#perfil-de-aplicativos-do-pc)
+Após instalar a edição completa, retire a mídia e reinicie. A tela de login gráfico abre automaticamente. Entre como `melkor` com a senha que você definiu no instalador para iniciar Umbriel com Noctalia. Ao encerrar a sessão, a tela de login volta. Nessa tela, `Ctrl+Alt+F2` abre o console de recuperação. A ISO pública PC Core inicia pelo console.
+
+Use `Super+Enter` para abrir Alacritty com Nushell. O Firefox ESR abre links HTTP e HTTPS por padrão. O lançador também inclui Brave Origin e Blanc. Os três navegadores reproduzem áudio pelo PipeWire da sessão. [Evidências do perfil](docs/TESTES.md#perfil-de-aplicativos-do-pc)
 
 ## A experiência pretendida
 
@@ -66,11 +68,11 @@ O host Bazzite é imutável e não tem `sudo` sem senha. As ferramentas de build
 | `make env BOARD=pc` e `make image BOARD=pc` | Contêiner de build, cache de fontes e saída própria para o alvo PC | Gera o core, o kernel e o bootloader do protótipo PC. |
 | `make image BOARD=pc MELKOR_PC_MINIMAL=1 OUT=out/pc-minimal` | Ambiente PC preparado e diretório de saída novo | Gera o core para o instalador público, com console, Wi-Fi, Ethernet, Quad9 DoH e RAUC. |
 | `make env BOARD=installer` e `make image BOARD=installer` | Contêiner de build, cache preparado e saída nova | Gera o kernel e o initramfs da mídia dedicada de instalação. |
-| `make installer-iso PC_OUT=out/pc` e `make test-installer` | Builds do PC e do instalador, `cpio`, `dosfstools`, QEMU e OVMF | Empacota o core na ISO e testa a instalação sem rede em um NVMe virtual. `TEST_SECTOR_SIZE=4096` testa 4Kn. [Validação do instalador](docs/TESTES.md#instalação-de-disco-inteiro) |
+| `make installer-iso PC_OUT=out/pc` e `make test-installer` | Builds do PC e do instalador, `cpio`, `dosfstools`, QEMU e OVMF | Empacota o core na ISO e testa a instalação sem rede em um NVMe virtual. `TEST_SECTOR_SIZE=4096` testa 4Kn. Na ISO completa, `TEST_VM_MEMORY=8192 PC_DESKTOP_LOGIN=1` testa o login com a senha provisionada. [Validação do instalador](docs/TESTES.md#instalação-de-disco-inteiro) |
 | `make pc-disk` e `make test-pc-disk` | Build PC, Go, `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools`, QEMU e OVMF | Cria um arquivo de disco de laboratório e inicia seus dois slots por NVMe virtual. `PC_DISK_GIB` ajusta os 16 GiB iniciais. |
 | `make pc-disk PC_CREDENTIALS=…` | Build PC, `fakeroot` do Buildroot e arquivo privado de hashes | Registra senhas separadas de root e do usuário comum nos dados persistentes. [Validação das contas](docs/TESTES.md#contas-locais-do-pc) |
-| `make test-pc-desktop` | Disco virtual PC, QEMU e OVMF | Exercita o login local e o terminal Wayland. `PC_DESKTOP_AUDIO=1` exercita a placa HDA virtual com `PC_DESKTOP_APPS=1`, a camada de aplicativos e o driver WAV do QEMU. |
-| `make pc-desktop-layer pc-chromium-layer pc-session-layer` | Podman rootless, Python 3.11+, curl e cache dos pacotes fixados | Prepara Alacritty e Firefox ESR, Brave Origin e Blanc, e compila Umbriel e Noctalia. [Build e testes do perfil](docs/TESTES.md#perfil-de-aplicativos-do-pc) |
+| `make test-pc-desktop` | Disco virtual PC, QEMU e OVMF | Exercita o login local e o terminal Wayland. `PC_DESKTOP_LOGIN=1` seleciona o teste do login gráfico com Umbriel. `PC_DESKTOP_AUDIO=1` exercita a placa HDA virtual com `PC_DESKTOP_APPS=1`, a camada de aplicativos e o driver WAV do QEMU. |
+| `make pc-desktop-layer pc-chromium-layer pc-session-layer` | Podman rootless, Python 3.11+, curl e cache dos pacotes fixados | Prepara os aplicativos e as dependências gráficas e compila Umbriel, Noctalia e gtkgreet. [Build e testes do perfil](docs/TESTES.md#perfil-de-aplicativos-do-pc) |
 | `make test-dns OUT=out/m1-doh` | Imagem M1, QEMU, OVMF, `tcpdump` e acesso HTTPS ao Quad9 | Confirma DoH pelo resolvedor da VM e inspeciona o tráfego com e sem acesso à internet. Use `DNS_IPV6_ONLY=1` em um host com acesso IPv6. |
 | `make test-dns BOARD=live` | ISO Live, QEMU, OVMF, `tcpdump` e acesso HTTPS ao Quad9 | Executa os mesmos casos de DoH pelo adaptador Ethernet virtual da sessão Live. |
 | `make bundle-m1 OUT=out/m1-rauc CERT=… KEY=… KEYRING=… VERSION=1.0` | Build do M1, certificado de assinatura, chave privada e chaveiro público confiável pela imagem | Usa o RAUC do build para gerar `OUT/melkor-m1-1.0.raucb` a partir do SquashFS. |

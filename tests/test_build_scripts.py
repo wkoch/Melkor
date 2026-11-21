@@ -212,6 +212,9 @@ source "$script" "$@"
         services = (target / "etc/dinit.d/boot").read_text()
         self.assertIn("waits-for = wifi", services)
         self.assertNotIn("seatd", services)
+        self.assertNotIn("graphical-login", services)
+        self.assertIn("tty1", (target / "etc/dinit.d/console-local").read_text())
+        self.assertFalse((target / "etc/pam.d/greetd").exists())
         self.assertIn("iwctl", (target / "etc/motd").read_text())
         self.assertFalse((target / "usr/bin/melkor-desktop").exists())
 
@@ -340,6 +343,21 @@ source "$script" "$@"
             browser_icon.parent.mkdir(parents=True)
             browser_icon.write_text("ícone")
         subprocess.run(["tar", "-czf", layer, "-C", payload, "."], check=True)
+        (target / "etc/dinit.d").mkdir()
+        for name in ("boot", "console-local"):
+            shutil.copy2(script.parent / "rootfs-overlay/etc/dinit.d" / name, target / "etc/dinit.d")
+        self.run_script(script, target, code=1, HOST_DIR=host, MELKOR_PC_DESKTOP_LAYER=layer,
+                        MELKOR_PC_SESSION_LAYER=layer)
+        self.assertNotIn("graphical-login", (target / "etc/dinit.d/boot").read_text())
+        (weston / "weston.ini").write_text("[core]\n")
+        for name in ("sbin/greetd", "sbin/unix_chkpwd", "bin/cage", "bin/gtkgreet", "bin/umbriel"):
+            binary = payload / "usr" / name
+            binary.parent.mkdir(parents=True, exist_ok=True)
+            binary.touch(0o755)
+        subprocess.run(["tar", "-czf", layer, "-C", payload, "."], check=True)
+        patchelf = host / "bin/patchelf"
+        patchelf.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$TEST_BOOT_LOG"\n')
+        patchelf.chmod(0o755)
         self.run_script(script, target, HOST_DIR=host, MELKOR_PC_DESKTOP_LAYER=layer,
                         MELKOR_PC_CHROMIUM_LAYER=layer, MELKOR_PC_SESSION_LAYER=layer)
         self.assertEqual((weston / "weston.ini").read_text(), "[core]\n[launcher]\n[launcher]\n")
@@ -347,6 +365,36 @@ source "$script" "$@"
         self.assertEqual((target / "usr/share/melkor/blanc.png").read_text(), "ícone")
         self.assertIn("x-scheme-handler/https=melkor-firefox.desktop;",
                       (target / "usr/share/applications/mimeapps.list").read_text())
+        self.assertIn("waits-for = graphical-login", (target / "etc/dinit.d/boot").read_text())
+        self.assertIn("tty2", (target / "etc/dinit.d/console-local").read_text())
+        service = (target / "etc/dinit.d/graphical-login").read_text()
+        self.assertIn("depends-on = persist", service)
+        self.assertIn("depends-on = seatd", service)
+        self.assertIn("user = melkor", (target / "etc/pam.d/greetd").read_text())
+        self.assertEqual(str((target / "usr/sbin/unix_chkpwd").readlink()), "/opt/melkor-desktop/usr/sbin/unix_chkpwd")
+        self.assertEqual((target / "opt/melkor-desktop/usr/sbin/unix_chkpwd").stat().st_mode & 0o7777, 0o700)
+        self.assertIn("/opt/melkor-desktop/lib/ld-musl-x86_64.so.1", self.boot_log.read_text())
+
+    def test_greeter_usa_runtime_privado_e_abre_apenas_umbriel(self):
+        wrapper = self.wrapper("greeter", '''
+mktemp() { command mktemp -d "$TEST_GREETER/XXXXXX"; }
+function /usr/bin/melkor-session-exec() {
+    test "$(stat -c %a "$XDG_RUNTIME_DIR")" = 700
+    test "$XDG_RUNTIME_DIR" = "$XDG_CACHE_HOME"
+    test "$LIBSEAT_BACKEND:$WLR_RENDERER:$GDK_BACKEND" = seatd:pixman:wayland
+    printf '%s\\n' "$@" > "$TEST_BOOT_LOG"
+    return "$TEST_GREETER_STATUS"
+}
+source "$1"
+''')
+        script = self.project / "core/board/pc/graphical-login/usr/libexec/melkor-greeter"
+        for status in (0, 1):
+            self.run_script(wrapper, script, code=status, TEST_GREETER=self.out, TEST_GREETER_STATUS=str(status))
+            self.assertEqual(self.boot_log.read_text().splitlines(), [
+                "cage", "-s", "--", "/usr/bin/melkor-session-exec", "gtkgreet",
+                "-c", "/usr/bin/melkor-desktop --umbriel",
+            ])
+            self.assertEqual(list(self.out.iterdir()), [self.downloads])
 
     def test_lancadores_pc_preservam_shell_e_isolam_o_navegador(self):
         binaries = self.project / "core/board/pc/rootfs-overlay/usr/bin"

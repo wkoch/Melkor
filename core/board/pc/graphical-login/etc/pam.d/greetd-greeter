@@ -1,0 +1,3 @@
+auth     required  /opt/melkor-desktop/usr/lib/security/pam_permit.so
+account  required  /opt/melkor-desktop/usr/lib/security/pam_succeed_if.so quiet user = greeter
+session  required  /opt/melkor-desktop/usr/lib/security/pam_permit.so

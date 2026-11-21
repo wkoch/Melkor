@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+umask 077
+runtime=$(mktemp -d /tmp/melkor-greeter.XXXXXX)
+trap 'rm -rf -- "$runtime"' EXIT
+export XDG_RUNTIME_DIR="$runtime"
+export XDG_CACHE_HOME="$runtime"
+export LIBSEAT_BACKEND=seatd
+export LIBINPUT_QUIRKS_DIR=/opt/melkor-desktop/usr/share/libinput
+export WLR_RENDERER=pixman
+export GDK_BACKEND=wayland
+export LANG=C.UTF-8
+/usr/bin/melkor-session-exec cage -s -- /usr/bin/melkor-session-exec gtkgreet -c '/usr/bin/melkor-desktop --umbriel'

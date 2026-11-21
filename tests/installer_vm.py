@@ -17,6 +17,7 @@ import time
 from types import SimpleNamespace
 
 from m1_dns_vm import BOOT
+from pc_desktop_vm import run_test as check_desktop
 
 
 def boot_ventoy(monitor, mode):
@@ -118,7 +119,7 @@ def install(vm, log, deadline, disk, passwords, sector):
             raise RuntimeError(result.decode(errors="replace").splitlines()[-1])
 
 
-def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None):
+def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None, graphical=False):
     if ventoy:
         check_ventoy_iso(iso, ventoy)
     qemu = os.environ.get("QEMU_SYSTEM") or shutil.which("qemu-system-x86_64", path=BOOT["SYSTEM_PATH"])
@@ -140,7 +141,8 @@ def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None
         stream.write(b"melkor-preservar\n")
     before = BOOT["file_digest"](neighbor)
     accel = os.environ.get("QEMU_ACCEL", "tcg")
-    passwords = tuple(secrets.token_hex(16).encode("ascii") for _ in range(2))
+    passwords = (secrets.token_hex(64 if graphical else 16).encode("ascii"),
+                 secrets.token_hex(16).encode("ascii"))
     with machine(qemu, accel, code, variables, disk, neighbor, run / "serial-install.log",
                  sector, iso, ventoy, mode, memory) as session:
         install(*session, 300, disk, passwords, sector)
@@ -159,12 +161,18 @@ def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None
     for slot in ("A", "B"):
         with machine(qemu, accel, code, variables, disk, neighbor, run / f"serial-{slot.lower()}.log", sector) as session:
             BOOT["check_console"](*session, 240, slot, pc=True, credentials=passwords)
+    if graphical:
+        desktop_logs = run / "desktop"
+        desktop_logs.mkdir()
+        check_desktop(disk, desktop_logs, apps=True, chromium=True, umbriel=True, audio=True,
+                      graphical=True, passwords=passwords)
     after = BOOT["file_digest"](neighbor)
     if before != after:
         raise RuntimeError("O NVMe vizinho foi alterado.")
     (run / "result.json").write_text(json.dumps({
         "slots": ["A", "B"], "iso_sha256": BOOT["file_digest"](iso), "setor_logico": sector,
         "midia": f"ventoy-{mode}" if ventoy else "cd-uefi",
+        "login_grafico": graphical,
         "vizinho_sha256_antes": before, "vizinho_sha256_depois": after,
     }, indent=2) + "\n")
 
@@ -177,13 +185,17 @@ def main():
     parser.add_argument("--sector-size", choices=(512, 4096), type=int, default=512)
     parser.add_argument("--ventoy-drive", type=Path, help="Arquivo regular do pendrive virtual contendo apenas esta ISO.")
     parser.add_argument("--ventoy-mode", choices=("normal", "grub2"), default="normal")
+    parser.add_argument("--graphical-login", action="store_true", help="Exercita o desktop com a senha criada no instalador.")
     args = parser.parse_args()
     if args.ventoy_drive is not None and not args.ventoy_drive.is_file():
         parser.error("--ventoy-drive precisa ser um arquivo regular")
     args.log_dir.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="install-", dir=args.log_dir)).resolve()
     print(f"Evidências em {run}", flush=True)
-    check_installation(args.iso.resolve(strict=True), run, args.sector_size, args.ventoy_drive, args.ventoy_mode, args.memory_mib)
+    if args.graphical_login and args.sector_size != 512:
+        parser.error("--graphical-login requer um disco virtual com setores de 512 bytes")
+    check_installation(args.iso.resolve(strict=True), run, args.sector_size, args.ventoy_drive,
+                       args.ventoy_mode, args.memory_mib, args.graphical_login)
     print("Instalação, cancelamento, vizinho intacto e primeiro boot nos dois slots verificados.")
 
 

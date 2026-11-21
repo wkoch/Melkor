@@ -15,6 +15,7 @@ REPO = "https://dl-cdn.alpinelinux.org/alpine/v3.24"
 LOCK = Path(__file__).resolve().parents[1] / "apps/desktop/alpine-3.24.lock"
 DEBIAN_LOCK = LOCK.with_name("debian-13.lock")
 SDK_LOCK = LOCK.with_name("alpine-3.24-sdk.lock")
+GREETER_PATCH = LOCK.parent / "patches" / "gtkgreet-login.patch"
 
 INSTALL = r"""
 mkdir /work/runtime
@@ -50,14 +51,18 @@ apk --no-network --repositories-file /dev/null --no-progress add --force-non-rep
 export TMPDIR=/work
 mkdir -p /usr/include/stb
 for header in /usr/include/stb_*.h; do ln -s "$header" /usr/include/stb/; done
-mkdir /work/src-noctalia /work/src-umbriel
+mkdir /work/src-noctalia /work/src-umbriel /work/src-gtkgreet
 tar -xzof /packages/noctalia-v5.6.0.tar.gz -C /work/src-noctalia --strip-components=1
 tar -xzof /packages/umbriel.tar.gz -C /work/src-umbriel --strip-components=1
+tar -xzof /packages/gtkgreet-0.8.tar.gz -C /work/src-gtkgreet --strip-components=1
+(cd /work/src-gtkgreet && patch -p1 < /packages/gtkgreet-login.patch)
 meson setup /work/build-umbriel /work/src-umbriel --prefix=/opt/melkor-desktop/usr \
     --buildtype=release -Dtests=disabled -Djemalloc=disabled -Dlocaled=disabled
 meson setup /work/build-noctalia /work/src-noctalia --prefix=/opt/melkor-desktop/usr \
     --buildtype=release -Dtests=disabled -Djemalloc=disabled
-for app in umbriel noctalia; do
+meson setup /work/build-gtkgreet /work/src-gtkgreet --prefix=/opt/melkor-desktop/usr \
+    --buildtype=release -Dlayershell=disabled -Dman-pages=disabled
+for app in umbriel noctalia gtkgreet; do
     meson compile -C "/work/build-$app" -j 6
     meson install -C "/work/build-$app" --destdir /work/stage --no-rebuild
     install -Dm644 "/work/src-$app/LICENSE" "/work/stage/opt/melkor-desktop/usr/share/licenses/$app/LICENSE"
@@ -104,6 +109,8 @@ def assemble(cache, output, profile="alpine"):
         }[profile]
         for package in pool.map(lambda line: fetch(cache, line), lock.read_text().splitlines()):
             shutil.copyfile(package, packages / package.name)
+        if profile == "session":
+            shutil.copyfile(GREETER_PATCH, packages / GREETER_PATCH.name)
         subprocess.run(["podman", "run", "--rm", "--network=none", "--security-opt", "label=disable",
                         "-v", f"{work}:/work", "-v", f"{packages}:/packages:ro", base, "sh", "-ec", install],
                        check=True)

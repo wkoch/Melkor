@@ -29,21 +29,64 @@ TONE = (
 )
 
 
-def desktop(console, qmp, run, apps, chromium, umbriel, audio):
-    BOOT["login"](console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
-    session = "" if umbriel else "--weston "
-    for char in f"melkor\nmelkor\nmelkor-desktop {session}>/tmp/melkor-gui.log 2>&1\n":
+def press(qmp, *keys, hold=45):
+    qmp("send-key", keys=[{"type": "qcode", "data": key} for key in keys], **{"hold-time": hold})
+    time.sleep((hold + 35) / 1000)
+
+
+def type_keys(qmp, text):
+    for char in text:
         keys = {
             " ": ["spc"], "\n": ["ret"], "-": ["minus"], "/": ["slash"], ".": ["dot"],
             ">": ["shift", "dot"], "&": ["shift", "7"],
         }.get(char, [char])
-        qmp("send-key", keys=[{"type": "qcode", "data": key} for key in keys], **{"hold-time": 45})
-        time.sleep(0.08)
+        press(qmp, *keys)
+
+
+def wait_greeter(console):
+    guest(console, 'for attempt in $(seq 1 20); do '
+          'for process in /proc/[0-9]*; do '
+          'grep -Eq "^Uid:[[:space:]]+203[[:space:]]" "$process/status" 2>/dev/null || continue; '
+          'if tr "\\000" " " < "$process/cmdline" | grep -q "/opt/melkor-desktop/usr/bin/gtkgreet -c "; '
+          'then exit 0; fi; done; sleep 1; done; ps; exit 1')
+
+
+def start_graphical_login(console, qmp, run, passwords):
+    guest(console, 'test ! -x /usr/sbin/unix_chkpwd && test ! -r /etc/shadow')
+    wait_greeter(console)
+    time.sleep(2)
+    qmp("screendump", filename=str(run / "00-login.ppm"))
+    type_keys(qmp, "melkor\n")
+    time.sleep(0.5)
+    type_keys(qmp, "senhaerrada\n")
+    time.sleep(3)
+    guest(console, 'test -z "$(ls -d /tmp/melkor-wayland.* 2>/dev/null)"')
+    qmp("screendump", filename=str(run / "00-login-recusado.ppm"))
+    type_keys(qmp, "root\n")
+    time.sleep(3)
+    guest(console, 'test -z "$(ls -d /tmp/melkor-wayland.* 2>/dev/null)"')
+    qmp("screendump", filename=str(run / "00-root-recusado.ppm"))
+    type_keys(qmp, "melkor\n")
+    time.sleep(0.5)
+    qmp("screendump", filename=str(run / "00-senha.ppm"))
+    type_keys(qmp, passwords[0].decode("ascii") + "\n")
+
+
+def desktop(console, qmp, run, apps, chromium, umbriel, audio, graphical, passwords):
+    BOOT["login"](console, b"melkor", passwords[0], rb"^[^\n]*\$ ")
     try:
+        if graphical:
+            start_graphical_login(console, qmp, run, passwords)
+        else:
+            session = "" if umbriel else "--weston "
+            type_keys(qmp, f"melkor\nmelkor\nmelkor-desktop {session}>/tmp/melkor-gui.log 2>&1\n")
         guest(console, "for attempt in $(seq 1 20); do "
-              'for device in /tmp/melkor-wayland.*/wayland-*; do [ -S "$device" ] && exit 0; done; '
-              "sleep 1; done; cat /tmp/melkor-gui.log; exit 1")
+              'for device in /tmp/melkor-wayland.*/wayland-*; do test -S "$device" && exit 0; done; '
+              "sleep 1; done; ls -ld /tmp/melkor*; cat /tmp/melkor-gui.log; exit 1")
         if umbriel:
+            guest(console, 'for process in /proc/[0-9]*; do '
+                  'if tr "\\000" " " < "$process/cmdline" | grep -q "^/opt/.* /opt/melkor-desktop/usr/bin/umbriel -c "; '
+                  'then grep -Eq "^Uid:[[:space:]]+1000[[:space:]]" "$process/status" && exit 0; fi; done; ps; exit 1')
             guest(console, 'for attempt in $(seq 1 16); do '
                   'for socket in /tmp/melkor-wayland.*/noctalia-wayland-*.sock; do '
                   'test -S "$socket" && exit 0; done; '
@@ -76,6 +119,19 @@ def desktop(console, qmp, run, apps, chromium, umbriel, audio):
             test_firefox(console, qmp, run, audio)
         if chromium:
             test_chromium(console, qmp, run, audio)
+        if graphical:
+            guest(console, 'for process in /proc/[0-9]*; do '
+                  'if tr "\\000" " " < "$process/cmdline" | grep -q "^/opt/.* /opt/melkor-desktop/usr/bin/umbriel -c "; '
+                  'then kill -TERM "${process##*/}" && exit 0; fi; done; exit 1')
+            wait_greeter(console)
+            time.sleep(1)
+            qmp("screendump", filename=str(run / "05-login-apos-sair.ppm"))
+            for number in (2, 1):
+                press(qmp, "ctrl", "alt", f"f{number}", hold=300)
+                guest(console, 'for attempt in $(seq 1 5); do '
+                      f'grep -Fx tty{number} /sys/class/tty/tty0/active && exit 0; sleep 1; '
+                      'done; cat /sys/class/tty/tty0/active; exit 1')
+                qmp("screendump", filename=str(run / f"06-vt{number}.ppm"))
     finally:
         with suppress(RuntimeError):
             qmp("screendump", filename=str(run / "tela-final.ppm"))
@@ -178,7 +234,7 @@ def test_chromium(console, qmp, run, audio):
             require_audio_stream(console, process)
 
 
-def run_test(image, run, apps, chromium, umbriel, audio):
+def run_test(image, run, apps, chromium, umbriel, audio, graphical=False, passwords=(b"melkor",)):
     code, variables = BOOT["find_firmware"](SimpleNamespace(
         ovmf_code=Path(code) if (code := os.environ.get("OVMF_CODE")) else None,
         ovmf_vars=Path(variables) if (variables := os.environ.get("OVMF_VARS")) else None))
@@ -233,7 +289,7 @@ def run_test(image, run, apps, chromium, umbriel, audio):
                         time.sleep(5)
                         qmp("screendump", filename=str(run / "00-boot.ppm"))
                         with BOOT["serial_console"](vm, log, 120) as console:
-                            desktop(console, qmp, run, apps, chromium, umbriel, audio)
+                            desktop(console, qmp, run, apps, chromium, umbriel, audio, graphical, passwords)
                         qmp("quit")
                         vm.wait(timeout=10)
             finally:
@@ -267,17 +323,19 @@ def main():
     parser.add_argument("--chromium", action="store_true")
     parser.add_argument("--umbriel", action="store_true")
     parser.add_argument("--audio", action="store_true")
+    parser.add_argument("--graphical-login", action="store_true")
     args = parser.parse_args()
     if args.audio and not args.apps:
         parser.error("--audio requer --apps.")
     args.log_dir.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="desktop-", dir=args.log_dir)).resolve()
     print(f"Evidências em {run}", flush=True)
-    run_test(args.image, run, args.apps, args.chromium, args.umbriel, args.audio)
+    umbriel = args.umbriel or args.graphical_login
+    run_test(args.image, run, args.apps, args.chromium, umbriel, args.audio, args.graphical_login)
     tested = "Alacritty com Nushell e Firefox ESR" if args.apps else "foot"
     if args.chromium:
         tested += ", Brave Origin e Blanc"
-    session = "Umbriel com Noctalia" if args.umbriel else "Weston"
+    session = "Umbriel com Noctalia" if umbriel else "Weston"
     print(f"Login local, {session} como usuário comum e abertura de {tested} verificados.")
     if args.audio:
         print("Reprodução por HDA virtual e rejeição de captura e de módulos Pulse verificadas.")

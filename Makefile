@@ -48,7 +48,9 @@ installer-iso:
 
 test-installer: BOARD = installer
 test-installer:
-	$(BUILD_ENV) python3 tests/installer_vm.py "$(OUT)/melkor-installer.iso" --log-dir "$(OUT)/tests" $(if $(TEST_SECTOR_SIZE),--sector-size "$(TEST_SECTOR_SIZE)") $(if $(TEST_VM_MEMORY),--memory-mib "$(TEST_VM_MEMORY)")
+	$(BUILD_ENV) python3 tests/installer_vm.py "$(OUT)/melkor-installer.iso" --log-dir "$(OUT)/tests" \
+		$(if $(TEST_SECTOR_SIZE),--sector-size "$(TEST_SECTOR_SIZE)") $(if $(TEST_VM_MEMORY),--memory-mib "$(TEST_VM_MEMORY)") \
+		$(if $(filter 1,$(PC_DESKTOP_LOGIN)),--graphical-login)
 
 test-boot:
 	$(BUILD_ENV) python3 scripts/test-boot.py "$(if $(filter pc,$(BOARD)),$(OUT)/melkor-pc.img,$(OUT)/build/images/melkor-$(BOARD).img)" --log-dir "$(OUT)/tests" \
@@ -119,7 +121,8 @@ test-pc-desktop: BOARD = pc
 test-pc-desktop:
 	$(BUILD_ENV) python3 tests/pc_desktop_vm.py "$(OUT)/melkor-pc.img" --log-dir "$(OUT)/desktop-tests" \
 		$(if $(filter 1,$(PC_DESKTOP_APPS)),--apps) $(if $(filter 1,$(PC_DESKTOP_CHROMIUM)),--chromium) \
-		$(if $(filter 1,$(PC_DESKTOP_UMBRIEL)),--umbriel) $(if $(filter 1,$(PC_DESKTOP_AUDIO)),--audio)
+		$(if $(filter 1,$(PC_DESKTOP_UMBRIEL)),--umbriel) $(if $(filter 1,$(PC_DESKTOP_AUDIO)),--audio) \
+		$(if $(filter 1,$(PC_DESKTOP_LOGIN)),--graphical-login)
 
 tools:
 	mkdir -p out/tools

@@ -1,0 +1,6 @@
+type = process
+command = /opt/melkor-desktop/usr/sbin/greetd
+depends-on = persist
+depends-on = seatd
+restart = true
+logfile = /run/melkor-greetd.log
