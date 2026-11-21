@@ -6,6 +6,8 @@ O marco M0 entrega uma imagem x86-64 que inicia por UEFI e chega ao console seri
 
 ## Testar a primeira prévia
 
+O [Melkor PC Core](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.4-core) instala por UEFI o core de console com Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. A release inclui a ISO para Ventoy, o bundle RAUC assinado, os checksums e as fontes usadas no build.
+
 Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot serial. A prévia inclui dinit, slots A/B, armazenamento persistente e DNS do sistema via Quad9 DoH. A release também oferece o CLI de aplicativos para o host Linux x86-64. A instalação em computador físico faz parte do M4. [Melkor v0.1.0-alpha.1](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
 
 Para conferir o HP ProBook x360 435 G7, use a ISO **Melkor Live** com Ventoy. Ela roda em RAM e abre um console local para conferir tela, teclado e a detecção de dispositivos. [Teste de hardware pelo pendrive](docs/INSTALACAO.md#teste-de-hardware-pelo-pendrive)
@@ -25,7 +27,7 @@ O fluxo previsto é baixar uma geração assinada do Melkor pela própria instal
 
 Quem modificar a receita poderá gerar a própria imagem em um ambiente de build, com as fontes e ferramentas necessárias. Isso pode ser feito localmente em vez de depender de outra máquina. Os projetos de origem fornecem as versões e correções usadas pelas receitas. A instalação e suas atualizações dispensam enviar alterações a esses projetos.
 
-No PC, entre com `su -` e execute `melkor-core-update`. O endereço de fábrica é `https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-channel.json`. Com uma release assinada disponível no canal, o comando encontra a revisão, valida o manifesto e instala o bundle no slot inativo. Reinicie para ativá-lo. A primeira publicação no canal está pendente. [Publicação do canal](docs/TESTES.md#canal-de-atualizações-do-pc)
+No PC, entre com `su -` e execute `melkor-core-update`. O endereço de fábrica é `https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-channel.json`. O comando consulta a revisão anunciada, valida o manifesto e instala uma versão mais recente no slot inativo. Reinicie para ativá-la. O canal oficial anuncia a revisão 1 do PC Core. [Publicação do canal](docs/TESTES.md#canal-de-atualizações-do-pc)
 
 Para usar outro endereço HTTPS que publique manifestos assinados pela chave do canal, execute `melkor-core-update --channel URL`. A escolha persiste entre atualizações. Use `melkor-core-update --reset-channel` para restaurar o endereço de fábrica. Para instalar um bundle específico, o PC aceita `melkor-core-update --https URL SHA256` e o PC e o M1 aceitam `melkor-core-update /caminho/bundle.raucb`. `melkor atualizar` atende aos aplicativos do catálogo. [Marcos](docs/MARCOS.md)
 

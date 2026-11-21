@@ -240,3 +240,9 @@ O Buildroot recompôs o core de revisão 1 com a toolchain PC já validada e as 
 Com OVMF e TCG, `tests/installer_vm.py --ventoy-drive` exercitou o pendrive virtual em modo normal, confirmou a instalação e os dois boots e preservou o disco vizinho. `make test-pc-desktop` verificou Umbriel, Noctalia, Alacritty, Nushell e os três navegadores com áudio em KVM. Os registros estão em `out/pc-official-prep/`. A publicação da imagem com os navegadores permanece pendente da revisão dos termos de redistribuição.
 
 O teste de atualização por TLS local em QEMU reconheceu a revisão oficial no manifesto Ed25519, rejeitou uma assinatura adulterada e instalou o bundle RAUC oficial pela opção `--https`. O slot B iniciou e preservou o documento gravado em A. Os registros estão em `out/pc-official-prep/signed-update-verified/`.
+
+### Primeira publicação do PC Core
+
+O Buildroot reconfigurou o alvo PC com `MELKOR_PC_MINIMAL=1`, recompôs a raiz de destino e gerou a revisão 1 com as chaves oficiais. A ISO de 157 MiB passou pelo Ventoy em modo normal no QEMU. O instalador iniciou os slots A e B e preservou o disco vizinho. O SHA-256 da ISO é `394676632894fa711b2364462b257a27356798ae0a2e5bc497ad2224d495dd7c`. [Release](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.4-core)
+
+`make bundle-pc` produziu o bundle RAUC assinado. A publicação conferiu seu download anônimo antes de publicar o manifesto gerado por `make channel-pc`. A VM do PC Core confirmou Quad9 DoH e reconheceu a revisão 1 pelo endereço oficial do GitHub. `make test` passou na CI com 80,1% em Go, 92,0% em Python e 97,3% em Shell. [Canal estável](https://github.com/wkoch/Melkor/releases/tag/pc-stable) · [Execução da CI](https://github.com/wkoch/Melkor/actions/runs/44941139935/job/136958394728)
