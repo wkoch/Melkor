@@ -286,6 +286,37 @@ class BootRunnerTest(unittest.TestCase):
     def test_m1_reutiliza_copia_gravavel_e_variaveis_nos_dois_slots(self):
         self.check_run(ab=True)
 
+    def test_sondas_emitem_campos_inteiros_com_mensagens_assincronas(self):
+        tools = self.path / "bin"
+        tools.mkdir()
+        for name, body in {
+            "awk": """case "$2" in
+    /proc/cmdline) printf '%s\n' 'rauc.slot=A' ;;
+    /proc/mounts) case "$1" in
+        *ext4*) printf '%s\n' 'rw,nosuid,nodev' ;;
+        *) printf '%s\n' 'squashfs,ro' ;;
+    esac ;;
+esac
+""",
+            "cat": """case "$1" in
+    /proc/1/comm) printf '%s\n' dinit ;;
+    *) printf '%s\n' melkor-m1-persistencia ;;
+esac
+""",
+        }.items():
+            executable = tools / name
+            executable.write_text("#!/bin/sh\nprintf '%s\n' '[  OK  ] rauc-setup' >&2\n" + body)
+            executable.chmod(0o755)
+
+        completed = subprocess.run(["sh", "-c", boot.PROBE + "; " + boot.PERSIST_PROBE],
+                                   env=os.environ | {"PATH": f"{tools}:{os.defpath}"},
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
+        lines = completed.stdout.splitlines()
+        for field in ("M0-ROOT=squashfs,ro", "M1-SLOT=rauc.slot=A", "M1-DATA=rw,nosuid,nodev",
+                      "M1-DOCUMENT=melkor-m1-persistencia"):
+            self.assertIn(field, lines)
+        self.assertEqual(lines.count("[  OK  ] rauc-setup"), 5)
+
     def test_live_inicia_por_usb_e_confere_hash_do_nvme(self):
         self.args.live = True
         attached = self.path / "internal-nvme.img"

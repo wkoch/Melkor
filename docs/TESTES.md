@@ -188,7 +188,7 @@ O teste rejeita a senha de laboratório antiga, autentica o usuário comum e con
 
 Execute `make check-m1` com a imagem já gerada, Python, `sfdisk` e `blkid`. A verificação inspeciona o GPT, os quatro sistemas de arquivos, o estado inicial do GRUB, a associação entre os `PARTUUIDs` e os slots do RAUC, os kernels e o UUID usado para montar os dados. Ela lê o arquivo de disco sem criar dispositivos de bloco no host.
 
-Execute `make test-boot BOARD=m1` com QEMU e OVMF. O teste cria uma cópia gravável do disco. Em A, faz login, grava um documento no home e sincroniza o disco. Em seguida, inicia outra VM com o mesmo disco e as mesmas variáveis UEFI, confirma que B está realçado no menu do GRUB antes de iniciar e confere o conteúdo. Os logs ficam em `serial-a.log` e `serial-b.log`, junto de `result.json`.
+Execute `make test-boot BOARD=m1` com QEMU e OVMF. O teste cria uma cópia gravável do disco. Em A, faz login, grava um documento no home e sincroniza o disco. Em seguida, inicia outra VM com o mesmo disco e as mesmas variáveis UEFI, confirma que B está realçado no menu do GRUB antes de iniciar e confere o conteúdo. Os logs ficam em `serial-a.log` e `serial-b.log`, junto de `result.json`. As sondas coletam cada valor antes de emitir sua linha no console. A regressão injeta uma mensagem assíncrona durante a coleta e verifica os campos completos.
 
 A imagem de fábrica contém a mesma geração nos dois slots. Esse teste verifica a seleção manual e a persistência.
 

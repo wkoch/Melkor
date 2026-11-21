@@ -28,15 +28,15 @@ PROBE = (
     'printf "\\nM0-ID=%s\\n" "$ID"; '
     'printf "M0-PID1=%s\\n" "$(cat /proc/1/comm)"; '
     'printf "M0-LOGIN=%s\\n" "$(id -un)"; '
-    'printf "M0-ROOT="; awk \'$2 == "/" {print $3 "," $4; exit}\' /proc/mounts; '
+    'printf "M0-ROOT=%s\\n" "$(awk \'$2 == "/" {print $3 "," $4; exit}\' /proc/mounts)"; '
     '[ -d /sys/firmware/efi ] && printf "M0-UEFI=yes\\n"; '
     'printf "M0-END\\n"'
 )
 PERSIST_PROBE = (
     '. /etc/os-release; printf "\\nM1-VERSION=%s\\n" "$VERSION_ID"; '
-    'printf "M1-SLOT="; awk \'{for (i=1; i<=NF; i++) if ($i ~ /^rauc[.]slot=/) print $i}\' /proc/cmdline; '
-    'printf "M1-DATA="; awk \'$2 == "/persist" && $3 == "ext4" {print $4; exit}\' /proc/mounts; '
-    'printf "M1-DOCUMENT="; cat "$HOME/.melkor-m1-probe"; '
+    'printf "M1-SLOT=%s\\n" "$(awk \'{for (i=1; i<=NF; i++) if ($i ~ /^rauc[.]slot=/) print $i}\' /proc/cmdline)"; '
+    'printf "M1-DATA=%s\\n" "$(awk \'$2 == "/persist" && $3 == "ext4" {print $4; exit}\' /proc/mounts)"; '
+    'printf "M1-DOCUMENT=%s\\n" "$(cat "$HOME/.melkor-m1-probe")"; '
     'printf "\\nM1-END\\n"'
 )
 WRITE_DOCUMENT = (
