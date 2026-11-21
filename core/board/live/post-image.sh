@@ -15,3 +15,10 @@ test -s "$stage/rootfs.cpio.gz"
 "$HOST_DIR/bin/grub-script-check" "$stage/EFI/BOOT/grub.cfg"
 "$HOST_DIR/bin/genimage" --rootpath "$stage" --inputpath "$stage" \
     --outputpath "$BINARIES_DIR" --tmppath "$stage.tmp" --config "$board_dir/genimage.cfg"
+
+mkdir -p "$stage/boot/grub"
+install -m 0644 "$board_dir/grub.cfg" "$stage/boot/grub/grub.cfg"
+"$HOST_DIR/bin/xorriso" -as mkisofs -R -V MELKOR_LIVE \
+    -e boot/efi.img -no-emul-boot -follow-links \
+    -o "$BINARIES_DIR/melkor-live.iso" -graft-points \
+    "/=$stage" "boot/efi.img=$BINARIES_DIR/melkor-live-eltorito.vfat"

@@ -62,6 +62,9 @@ jobs:
         env:
           QEMU_ACCEL: tcg
         run: make test-boot BOARD=${{ matrix.board }}
+      - name: Iniciar a ISO Live como mídia óptica UEFI
+        if: matrix.board == 'live'
+        run: python3 scripts/test-boot.py out/live/build/images/melkor-live.iso --live --log-dir out/live/iso-tests
       - name: Guardar evidências
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -74,3 +77,5 @@ jobs:
             out/${{ matrix.board }}/SHA256SUMS
             out/${{ matrix.board }}/tests/*/result.json
             out/${{ matrix.board }}/tests/*/serial*.log
+            out/${{ matrix.board }}/iso-tests/*/result.json
+            out/${{ matrix.board }}/iso-tests/*/serial*.log

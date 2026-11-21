@@ -56,7 +56,9 @@ O processo deve terminar com código `1`. Em `result.json`, verifique a mensagem
 
 ## Boot da mídia de diagnóstico
 
-Execute `make check-env BOARD=live`, `make image BOARD=live OUT=out/live-hp` e `make test-boot BOARD=live OUT=out/live-hp`. O teste usa QEMU, OVMF, `sfdisk` e `mke2fs` para simular um pendrive protegido contra gravação e um NVMe gravável com GPT e um volume ext4 válido. Ambos são arquivos locais e nenhum periférico físico é repassado à VM. A sessão valida a raiz em RAM, o framebuffer, a enumeração dos dois dispositivos, as permissões do usuário comum e a escrita no home volátil. O executor calcula o hash do NVMe antes e depois da sessão. `QEMU_ACCEL=tcg` exercita o mesmo cenário sem KVM.
+Execute `make check-env BOARD=live`, `make image BOARD=live OUT=out/live-hp` e `make test-boot BOARD=live OUT=out/live-hp`. O teste usa QEMU com TCG, OVMF, `sfdisk` e `mke2fs`. O pendrive virtual abre em modo somente leitura. O NVMe virtual gravável contém uma GPT e um volume ext4 válido. A sessão verifica raiz em RAM, framebuffer, detecção dos dispositivos, permissões do usuário comum e escrita no home volátil. O executor calcula o hash do NVMe antes e depois da sessão.
+
+Para iniciar a ISO como CD UEFI, execute `distrobox enter -n melkor-build -- python3 scripts/test-boot.py out/live-hp/build/images/melkor-live.iso --live --log-dir out/live-hp/iso-tests`. Em um host que já tem os pré-requisitos do QEMU e OVMF, execute o mesmo comando a partir de `python3`. Para testar o Ventoy, copie essa mesma ISO para a partição de dados de um pendrive Ventoy virtual, selecione o modo normal no menu e confirme o login pelo console de vídeo da VM.
 
 Depois da validação virtual, use a mídia no notebook para conferir o console com tela e teclado locais e obter os IDs dos componentes. [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 

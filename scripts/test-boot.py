@@ -46,8 +46,9 @@ WRITE_DOCUMENT = (
 LIVE_PROBE = (
     '. /etc/os-release; printf "\\nLIVE-VERSION=%s\\n" "$VERSION_ID"; '
     '[ "$(id -u)" -eq 1000 ] && printf "LIVE-USER=ok\\n"; '
-    '[ -d /sys/class/graphics/fb0 ] && printf "LIVE-DISPLAY=ok\\n"; '
-    '[ -b /dev/sda ] && [ -b /dev/nvme0n1p1 ] && printf "LIVE-DEVICES=ok\\n"; '
+    'grep -q "frame buffer" /sys/class/vtconsole/vtcon*/name && printf "LIVE-DISPLAY=ok\\n"; '
+    'for attempt in 1 2 3 4 5; do live_media && [ -b /dev/nvme0n1p1 ] && break; sleep 1; done; '
+    'live_media && [ -b /dev/nvme0n1p1 ] && printf "LIVE-DEVICES=ok\\n"; '
     '[ ! -w /dev/sda ] && [ ! -w /dev/nvme0n1 ] && printf "LIVE-PERMISSIONS=ok\\n"; '
     'lspci >/dev/null && lsusb >/dev/null && /usr/sbin/iw dev >/dev/null && printf "LIVE-TOOLS=ok\\n"; '
     'awk \'$2 == "/" && $3 ~ /^(rootfs|ramfs|tmpfs)$/ {ram=1} '
@@ -168,11 +169,15 @@ def check_console(process, log, timeout, slot=None):
             raise RuntimeError("A partição ext4 de dados precisa estar montada para escrita.")
 
 
-def check_live_console(process, log, timeout):
+def check_live_console(process, log, timeout, optical=False):
     with serial_console(process, log, timeout) as console:
         login(console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
-        console.send((PROBE + "; " + LIVE_PROBE).encode("ascii"))
-        lines = console.expect(rb"^LIVE-END\r?$", "verificação do ambiente em RAM").splitlines()
+        console.send(PROBE.encode("ascii"))
+        system = console.expect(rb"^M0-END\r?$", "verificação do boot UEFI")
+        media = "grep -qx 5 /sys/bus/scsi/devices/*/type" if optical else "[ -b /dev/sda ]"
+        console.send(f"live_media() {{ {media}; }}; {LIVE_PROBE}".encode("ascii"))
+        live = console.expect(rb"^LIVE-END\r?$", "verificação do ambiente em RAM")
+    lines = system.splitlines() + live.splitlines()
     for field in (b"M0-ID=melkor", b"M0-PID1=dinit", b"M0-UEFI=yes", b"LIVE-VERSION=live", b"LIVE-USER=ok",
                   b"LIVE-DISPLAY=ok", b"LIVE-DEVICES=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-TOOLS=ok",
                   b"LIVE-RAM=ok", b"LIVE-HOME=ok"):
@@ -210,8 +215,9 @@ def run(args, report_dir, report):
 
     accel = args.accel
     if accel == "auto":
-        accel = "kvm" if os.access("/dev/kvm", os.R_OK | os.W_OK) else "tcg"
+        accel = "kvm" if not args.live and os.access("/dev/kvm", os.R_OK | os.W_OK) else "tcg"
     timeout = args.timeout or (90 if accel == "kvm" else 240)
+    optical = args.live and disk.suffix.lower() == ".iso"
 
     def drive(path, options):
         return f"file={str(path).replace(',', ',,')},format=raw,{options}"
@@ -219,14 +225,22 @@ def run(args, report_dir, report):
     command = [qemu, "-machine", "q35", "-accel", accel, "-m", "512", "-display", "none",
                "-serial", "stdio", "-monitor", "none", "-nic", "none", "-no-reboot",
                "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
-               "-drive", drive(variables_copy, "if=pflash,unit=1"),
-               "-drive", drive(disk, "if=none,id=melkor" if args.ab else "if=none,id=melkor,readonly=on")]
+               "-drive", drive(variables_copy, "if=pflash,unit=1")]
+    media_options = "if=none,id=melkor"
+    if optical:
+        media_options += ",media=cdrom"
+    elif not args.ab:
+        media_options += ",readonly=on"
+    command += ["-drive", drive(disk, media_options)]
     if args.live:
         attached = report_dir / "internal-nvme.img"
         create_live_test_disk(attached)
         report["internal_sha256_before"] = file_digest(attached)
-        command += ["-device", "qemu-xhci,id=xhci", "-device", "usb-storage,bus=xhci.0,drive=melkor,bootindex=1",
-                    "-drive", drive(attached, "if=none,id=internal"),
+        if optical:
+            command += ["-device", "ide-cd,bus=ide.0,drive=melkor,bootindex=1"]
+        else:
+            command += ["-device", "qemu-xhci,id=xhci", "-device", "usb-storage,bus=xhci.0,drive=melkor,bootindex=1"]
+        command += ["-drive", drive(attached, "if=none,id=internal"),
                     "-device", "nvme,drive=internal,serial=melkor-teste"]
     else:
         command += ["-device", "virtio-blk-pci,drive=melkor,bootindex=1"]
@@ -240,7 +254,7 @@ def run(args, report_dir, report):
         ) as process:
             try:
                 if args.live:
-                    check_live_console(process, log, timeout)
+                    check_live_console(process, log, timeout, optical)
                 else:
                     check_console(process, log, timeout, slot)
             finally:
@@ -261,7 +275,7 @@ def main():
     parser.add_argument("image", type=Path)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--ab", action="store_true", help="Inicia A e B e verifica o mesmo documento.")
-    mode.add_argument("--live", action="store_true", help="Inicia por USB e verifica o NVMe virtual.")
+    mode.add_argument("--live", action="store_true", help="Inicia por USB ou CD UEFI e verifica o NVMe virtual.")
     parser.add_argument("--log-dir", type=Path, default=Path("out/boot-tests"))
     parser.add_argument("--ovmf-code", type=Path, default=os.environ.get("OVMF_CODE"))
     parser.add_argument("--ovmf-vars", type=Path, default=os.environ.get("OVMF_VARS"))
@@ -282,7 +296,7 @@ def main():
         if args.ab:
             print("Slots A e B iniciados via UEFI. Documento criado em A e reaberto em B.")
         elif args.live:
-            print("Boot USB via UEFI, framebuffer, login em RAM e NVMe virtual intacto verificados.")
+            print("Boot da mídia via UEFI, framebuffer, login em RAM e NVMe virtual intacto verificados.")
         else:
             print("Login serial UEFI, identidade Melkor, dinit como PID 1 e raiz somente para leitura verificados.")
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:

@@ -43,6 +43,8 @@ elif tool == "make":
         (build / "images").mkdir()
         board = (build / "board").read_text()
         (build / "images" / f"melkor-{board}.img").write_text("disco virtual")
+        if board == "live":
+            (build / "images/melkor-live.iso").write_text("mídia óptica virtual")
         tools = build / "host/bin"
         tools.mkdir(parents=True)
         for name in ("gcc", "ld", "readelf"):
@@ -83,5 +85,11 @@ elif tool == "grub-editenv":
 elif tool == "openssl":
     assert args[:3] == ["crl2pkcs7", "-nocrl", "-certfile"] and args[4:] == ["-out", "/dev/null"]
     assert Path(args[3]).read_text().startswith("-----BEGIN CERTIFICATE-----\n")
+elif tool == "xorriso":
+    assert args[args.index("-e") + 1] == "boot/efi.img" and "-no-emul-boot" in args
+    assert args[-1].endswith("/melkor-live-eltorito.vfat")
+    tree = Path(next(arg[2:] for arg in args if arg.startswith("/=")))
+    assert (tree / "boot/grub/grub.cfg").read_bytes() == (tree / "EFI/BOOT/grub.cfg").read_bytes()
+    assert (tree / "rootfs.cpio.gz").read_text() == "initramfs"
 elif tool not in ("sudo", "mke2fs", "grub-script-check"):
     sys.exit(f"ferramenta de teste inesperada: {tool}")

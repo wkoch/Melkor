@@ -139,3 +139,18 @@ O catálogo separado passou pelo teste local de proposta, aceite, sincronizaçã
 Gerar instalador e mídia de resgate. Oferecer imagem previamente construída e modo de compilação local que parta de uma toolchain inicial identificada. Testar instalação em disco virtual vazio e atualização a partir de uma versão anterior com documentos e aplicativos. Validar em hardware próprio por mídia ou SSD de teste: GPU, armazenamento, rede, áudio, suspensão, monitores e latência de abertura dos aplicativos. Documentar a recuperação antes de promover o Melkor a sistema de uso diário.
 
 Aplicar os [padrões da primeira instalação](INSTALACAO.md) e demonstrar disco único, swap em arquivo, conta comum e administração root explícita. Validar cadastro, desbloqueio e recuperação por senha com o sensor do notebook.
+
+### Prévia de diagnóstico para o notebook
+
+O primeiro teste físico usa a ISO `v0.1.0-alpha.2` pelo Ventoy. O boot abre um console local sem montar o SSD. A instalação em disco inteiro, o provisionamento de contas e swap e os testes dos drivers na unidade do William são etapas pendentes. [Release Live](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.2) · [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
+
+| Comando ou cenário | Pré-requisito e resultado |
+| --- | --- |
+| `make env BOARD=live` e `make check-env BOARD=live` | No Fedora 45 do contêiner `melkor-build`, as fontes do kernel, do firmware, dos utilitários e do xorriso passaram pela verificação de hashes e pelo teste de cache offline. |
+| `make image BOARD=live OUT=out/live-hp-preview` | Build limpo da mídia. Para adicionar a ISO na mesma saída, o Buildroot executou `melkor_live_defconfig`, `grub2-rebuild`, `all` e `target-post-image`. `xorriso -report_el_torito plain` confirmou o registro de boot UEFI. |
+| `make test-boot BOARD=live OUT=out/live-hp-preview` | Com TCG e OVMF, boot pelo USB virtual, login comum e NVMe ext4 intacto. O boot do pendrive com KVM nesse host não encontrou a entrada USB no OVMF. O executor Live usa TCG por padrão. |
+| `distrobox enter -n melkor-build -- python3 scripts/test-boot.py out/live-hp-preview/build/images/melkor-live.iso --live --log-dir out/live-hp-preview/iso-tests` | Boot da ISO como CD UEFI com a mesma verificação de login, console, raiz em RAM e hash integral do NVMe. |
+| Ventoy 1.1.18 em QEMU com TCG e OVMF | O pendrive virtual recebeu a ISO em uma partição de dados FAT32. O SHA-256 do arquivo copiado conferiu. Os modos normal e GRUB2 chegaram ao console de vídeo. O login pelo teclado autenticou o usuário comum em ambos. O NVMe foi detectado e seu hash permaneceu igual. |
+| `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | Com Go, coverage.py e kcov, a suíte passou com 86,7% em Go, 95,3% em Python e 96,9% em Shell. |
+
+O SHA-256 da ISO é `3a855577a11f6f4418a24f9cc9a6863b136db8ab4a80975ab2d4fcd080010b93`. A edição do M1 para QEMU também passou pela revalidação de boot A/B e persistência. Na imagem separada de laboratório, o procedimento de `make test-update OUT=out/m1-doh …` passou nos cenários de candidata saudável, falha antes da confirmação e interrupção da gravação.

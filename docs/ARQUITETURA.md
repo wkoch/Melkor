@@ -48,7 +48,9 @@ O core inclui `ca-certificates` 20260816+nmu1 e `libcap-ng` 0.8.5 das receitas d
 
 ### Mídia de diagnóstico em RAM
 
-O alvo `live` gera uma imagem GPT com uma única ESP. O GRUB carrega dali o kernel e um initramfs comprimido. O dinit abre o login em `tty1` e no primeiro console serial. O sistema monta apenas os sistemas de arquivos virtuais necessários para o console e mantém o home em RAM. Root permanece bloqueado e a mídia não inicia serviços para obter conectividade. O kernel disponibiliza framebuffer EFI, armazenamento USB e NVMe, AHCI e HID para sondar os dispositivos.
+O alvo `live` gera uma ISO com entrada UEFI El Torito e uma imagem GPT com uma única ESP. O GRUB carrega o kernel e um initramfs comprimido. O dinit abre o login em `tty1` e no primeiro console serial. O sistema monta os sistemas de arquivos virtuais necessários para o console e mantém o home em RAM. Root permanece bloqueado e a mídia não inicia serviços para obter conectividade. O kernel disponibiliza framebuffer EFI, armazenamento USB e NVMe, AHCI e HID para sondar os dispositivos.
+
+O GNU xorriso 1.5.4.pl02 da receita do Buildroot roda no host de build. A imagem de boot EFI na ISO tem 30 MiB para que o catálogo El Torito registre seu tamanho em setores de 512 bytes. O kernel, o initramfs e a configuração do GRUB também estão no sistema de arquivos ISO 9660. [Formato El Torito no xorriso](https://www.gnu.org/software/xorriso/man_1_xorrisofs.html)
 
 As receitas do Buildroot fixado fornecem `iw` 6.9 e `libnl` 3.11.0 para a enumeração das interfaces. `linux-firmware` 20250211 entra na mídia com a seleção `22260` para o Intel AX200 e os arquivos `rtw88` para placas Realtek. O Buildroot verifica os hashes das fontes. O kernel e os utilitários do Live entram apenas nessa mídia. [Receitas no Buildroot fixado](https://gitlab.com/buildroot.org/buildroot/-/tree/2025.02.20/package) · [Opções Intel na família HP](https://jp.ext.hp.com/notebooks/business/probook_x360_435_g7/) · [Suporte Realtek listado pela HP](https://support.hp.com/soar-attachment/977/col94858-ob-276296-1-ob-276296-1_sp121426_releasedoc.html)
 

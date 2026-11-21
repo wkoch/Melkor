@@ -71,5 +71,9 @@ toolchain="$build/host/bin/x86_64-buildroot-linux-musl"
 } > "$output/toolchain.txt"
 
 cd -- "$build/images"
-sha256sum "melkor-$board.img" > "$output/SHA256SUMS"
+images=("melkor-$board.img")
+if [[ "$board" == live ]]; then
+    images+=(melkor-live.iso)
+fi
+sha256sum "${images[@]}" > "$output/SHA256SUMS"
 printf 'Imagem gerada em %s/melkor-%s.img\n' "$PWD" "$board"

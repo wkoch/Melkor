@@ -232,6 +232,20 @@ class BootRunnerTest(unittest.TestCase):
                 self.assertTrue(all(attached in call.args[0] for call in setup_disk.call_args_list))
                 attached.unlink()
 
+    def test_live_inicia_iso_como_cd_uefi(self):
+        self.args.live = True
+        self.args.image = self.path / "melkor-live.iso"
+        self.args.image.write_bytes(b"iso")
+        with patch.dict(os.environ, {"QEMU_SYSTEM": "/test/qemu"}), \
+             patch.object(boot.subprocess, "run"), patch.object(boot.subprocess, "Popen") as spawn, \
+             patch.object(boot, "check_live_console") as check:
+            spawn.return_value.__enter__.return_value.stdout.read.return_value = b"final"
+            boot.run(self.args, self.path, {})
+        command = spawn.call_args.args[0]
+        self.assertIn("ide-cd,bus=ide.0,drive=melkor,bootindex=1", command)
+        self.assertTrue(any("id=melkor,media=cdrom" in value for value in command))
+        self.assertTrue(check.call_args.args[-1])
+
     def check_run(self, ab):
         self.args.ab = ab
         report = {}

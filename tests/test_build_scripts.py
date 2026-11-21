@@ -29,7 +29,7 @@ class BuildScriptsTest(unittest.TestCase):
         cls.bin = cls.work / "bin"
         cls.bin.mkdir()
         for name in ("git", "make", "rpm", "sudo", "distrobox", "mke2fs", "genimage", "grub-script-check",
-                     "grub-editenv", "openssl"):
+                     "grub-editenv", "openssl", "xorriso"):
             (cls.bin / name).symlink_to(cls.stub)
         cls.marker = cls.work / "container"
         cls.marker.touch()
@@ -112,6 +112,8 @@ source "$1"
                 build = self.out / board
                 digest = hashlib.sha256((build / "build/images" / f"melkor-{board}.img").read_bytes()).hexdigest()
                 self.assertEqual((build / "SHA256SUMS").read_text().split()[0], digest)
+                if board == "live":
+                    self.assertEqual(len((build / "SHA256SUMS").read_text().splitlines()), 2)
                 self.assertIn("musl", (build / "toolchain.txt").read_text())
                 self.assertEqual(json.loads((build / "packages.json").read_text()), {"mock": "manifesto"})
 
