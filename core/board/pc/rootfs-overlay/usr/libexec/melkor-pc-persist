@@ -5,6 +5,8 @@ export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 mount -t ext4 -o nosuid,nodev /run/melkor/data /persist
 melkor-storage credenciais
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
+install -d -m 1777 /dev/shm
+mount -t tmpfs -o mode=1777,nosuid,nodev,noexec tmpfs /dev/shm
 install -d -m 0700 -o melkor -g melkor /persist/melkor
 install -d -m 0700 -o root -g root /persist/iwd
 mount -o bind /persist/melkor /home/melkor

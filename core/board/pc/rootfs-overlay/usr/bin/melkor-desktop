@@ -7,4 +7,8 @@ trap 'rm -rf -- "$session"' EXIT
 export XDG_RUNTIME_DIR="$session"
 export LIBSEAT_BACKEND=seatd
 export LANG=C.UTF-8
-dbus-run-session -- weston --renderer=pixman
+case "${1:-}" in
+    --umbriel) dbus-run-session -- /usr/bin/melkor-session-exec umbriel -c /etc/xdg/melkor/umbriel.toml ;;
+    ""|--weston) dbus-run-session -- weston --renderer=pixman ;;
+    *) printf '%s\n' 'Uso: melkor-desktop [--weston|--umbriel]' >&2; exit 2 ;;
+esac

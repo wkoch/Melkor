@@ -3,6 +3,10 @@ OUT ?= out/$(BOARD)
 TEST_PYTHON ?= python3
 PC_DISK_GIB ?= 16
 PC_OUT ?= out/pc
+PC_DESKTOP_CACHE ?= out/cache/pc-desktop
+PC_DESKTOP_LAYER ?= out/pc-desktop.layer.tar.gz
+PC_CHROMIUM_LAYER ?= out/pc-chromium.layer.tar.gz
+PC_SESSION_LAYER ?= out/pc-session.layer.tar.gz
 
 # No host Bazzite, as ferramentas de build e de teste ficam no contêiner melkor-build.
 # No CI, sem distrobox, os comandos rodam diretamente.
@@ -22,7 +26,20 @@ check-env:
 image:
 	$(BUILD_ENV) env MELKOR_RAUC_KEYRING="$(MELKOR_RAUC_KEYRING)" MELKOR_LAB_ROOT_HASH_FILE="$(MELKOR_LAB_ROOT_HASH_FILE)" \
 		MELKOR_CHANNEL_PUBLIC_KEY="$(MELKOR_CHANNEL_PUBLIC_KEY)" MELKOR_CORE_REVISION="$(MELKOR_CORE_REVISION)" \
+		MELKOR_PC_DESKTOP_LAYER="$(MELKOR_PC_DESKTOP_LAYER)" \
+		MELKOR_PC_CHROMIUM_LAYER="$(MELKOR_PC_CHROMIUM_LAYER)" \
+		MELKOR_PC_SESSION_LAYER="$(MELKOR_PC_SESSION_LAYER)" \
 		./scripts/build-image.sh "$(OUT)" "$(BOARD)"
+
+.PHONY: pc-desktop-layer pc-chromium-layer pc-session-layer
+pc-desktop-layer:
+	$(TEST_PYTHON) scripts/pc-desktop-layer.py "$(PC_DESKTOP_CACHE)" "$(PC_DESKTOP_LAYER)"
+
+pc-chromium-layer:
+	$(TEST_PYTHON) scripts/pc-desktop-layer.py "$(PC_DESKTOP_CACHE)" "$(PC_CHROMIUM_LAYER)" --profile chromium
+
+pc-session-layer:
+	$(TEST_PYTHON) scripts/pc-desktop-layer.py "$(PC_DESKTOP_CACHE)" "$(PC_SESSION_LAYER)" --profile session
 
 installer-iso: BOARD = installer
 installer-iso:
@@ -30,7 +47,7 @@ installer-iso:
 
 test-installer: BOARD = installer
 test-installer:
-	$(BUILD_ENV) python3 tests/installer_vm.py "$(OUT)/melkor-installer.iso" --log-dir "$(OUT)/tests" $(if $(TEST_SECTOR_SIZE),--sector-size "$(TEST_SECTOR_SIZE)")
+	$(BUILD_ENV) python3 tests/installer_vm.py "$(OUT)/melkor-installer.iso" --log-dir "$(OUT)/tests" $(if $(TEST_SECTOR_SIZE),--sector-size "$(TEST_SECTOR_SIZE)") $(if $(TEST_VM_MEMORY),--memory-mib "$(TEST_VM_MEMORY)")
 
 test-boot:
 	$(BUILD_ENV) python3 scripts/test-boot.py "$(if $(filter pc,$(BOARD)),$(OUT)/melkor-pc.img,$(OUT)/build/images/melkor-$(BOARD).img)" --log-dir "$(OUT)/tests" \
@@ -99,7 +116,7 @@ test-pc-disk: test-boot
 
 test-pc-desktop: BOARD = pc
 test-pc-desktop:
-	$(BUILD_ENV) python3 tests/pc_desktop_vm.py "$(OUT)/melkor-pc.img" --log-dir "$(OUT)/desktop-tests"
+	$(BUILD_ENV) python3 tests/pc_desktop_vm.py "$(OUT)/melkor-pc.img" --log-dir "$(OUT)/desktop-tests" $(if $(filter 1,$(PC_DESKTOP_APPS)),--apps) $(if $(filter 1,$(PC_DESKTOP_CHROMIUM)),--chromium) $(if $(filter 1,$(PC_DESKTOP_UMBRIEL)),--umbriel)
 
 tools:
 	mkdir -p out/tools

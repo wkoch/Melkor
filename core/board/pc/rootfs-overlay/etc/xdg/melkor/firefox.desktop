@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Firefox ESR
+Exec=/usr/bin/melkor-firefox %U
+Icon=/usr/share/melkor/firefox.png
+Categories=Network;WebBrowser;

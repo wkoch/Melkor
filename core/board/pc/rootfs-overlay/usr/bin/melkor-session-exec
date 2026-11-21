@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+runtime=/opt/melkor-desktop
+case "${1:-}" in
+    umbriel|noctalia) program="$runtime/usr/bin/$1" ;;
+    *) exit 2 ;;
+esac
+shift
+export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
+export GBM_BACKENDS_PATH="$runtime/usr/lib/gbm"
+export WLR_RENDERER_ALLOW_SOFTWARE=1
+exec "$runtime/lib/ld-musl-x86_64.so.1" --library-path "$runtime/lib:$runtime/usr/lib" "$program" "$@"

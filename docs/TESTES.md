@@ -92,6 +92,22 @@ Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` p
 
 Para testar o RAUC nesse disco, use o procedimento de credenciais descartáveis descrito para o M1 e troque o alvo de build para `BOARD=pc`. Execute `make pc-disk` com o mesmo `OUT`, `make bundle-pc` com o certificado desse laboratório e `make test-update BOARD=pc` com o mesmo certificado, a chave e o arquivo da senha de root. A diferença de identificador RAUC entre PC e M1 também é um caso de rejeição.
 
+## Perfil de aplicativos do PC
+
+Prepare as camadas em um host com Podman rootless, Python 3.11+ e curl. O cache guarda APKs, DEBs e arquivos dos fornecedores com SHA-256 fixado em `apps/desktop/`. A rede é usada para obter as entradas e as imagens OCI no primeiro build. Os contêineres de montagem e compilação rodam sem rede.
+
+```sh
+make pc-desktop-layer pc-chromium-layer pc-session-layer
+make image BOARD=pc OUT=out/pc-apps \
+  MELKOR_PC_DESKTOP_LAYER="$PWD/out/pc-desktop.layer.tar.gz" \
+  MELKOR_PC_CHROMIUM_LAYER="$PWD/out/pc-chromium.layer.tar.gz" \
+  MELKOR_PC_SESSION_LAYER="$PWD/out/pc-session.layer.tar.gz"
+make pc-disk OUT=out/pc-apps
+make test-pc-desktop OUT=out/pc-apps PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_UMBRIEL=1
+```
+
+O executor inicia o compositor, verifica que Noctalia foi aberta pela sessão, aciona o terminal e executa a expressão `[1 2 3] | math sum` com Nushell. O Firefox renderiza uma página local e abre a interface. Nos navegadores Chromium a prova exige um processo de renderização com filtro seccomp. Os logs seriais e as capturas ficam em `OUT/desktop-tests/`. O plano de instalação com todos os aplicativos usa `make test-installer TEST_VM_MEMORY=8192`, porque os dois slots e a imagem temporária ocupam RAM durante a gravação.
+
 ## Download HTTPS de atualizações do PC
 
 Use um build `BOARD=pc` com o certificado público descartável em `MELKOR_RAUC_KEYRING`. Gere o disco virtual no mesmo `OUT` passando `PC_CREDENTIALS` com os hashes da senha descartável de root e da conta comum. O teste requer Python 3.11+, QEMU, OVMF, OpenSSL e `mke2fs`.

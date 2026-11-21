@@ -214,3 +214,11 @@ A mídia dedicada empacota o core PC e prepara uma GPT pelo tamanho e pelo setor
 A mesma ISO passou pela instalação offline em QEMU 11.1.3 com OVMF e TCG, como CD UEFI com setores lógicos de 512 bytes, pelo modo normal do Ventoy 1.1.18 com 512 bytes e pelo modo GRUB2 com 4096 bytes. Em cada um, a confirmação inválida preservou o destino. A instalação válida fez a GPT até a reserva final, protegeu as senhas e chegou ao login nos dois slots, com swap ativo e o mesmo documento. O disco vizinho de 13 GiB manteve o SHA-256 integral. Os relatórios estão em `out/installer-clean/evidence/`.
 
 `make installer-iso OUT=out/installer-https-lab PC_OUT=out/pc-https` reempacotou a mídia com o core que inclui o atualizador. `make test-installer BUILD_ENV= OUT=out/installer-https-lab` passou pelo CD UEFI com o QEMU 11.1.3 do host em TCG. Os dois slots iniciaram e o disco vizinho manteve seu SHA-256. O relatório está em `out/installer-https-lab/tests/install-ac346fvy/result.json`.
+
+### Prévia com aplicativos
+
+O core de laboratório em `out/pc-apps-release` inclui Nushell, Alacritty, Firefox ESR, Brave Origin, Blanc, Umbriel e Noctalia. O build reutilizou a toolchain do PC, recompilou o kernel com namespaces de usuário e manteve dinit como PID 1. As receitas e os hashes do SDK e das camadas ficam em `apps/desktop/`.
+
+O executor `tests/pc_desktop_vm.py --apps --chromium --umbriel` iniciou a sessão gráfica com a conta comum. Noctalia abriu o painel e o atalho `Super+Enter` iniciou o Nushell no Alacritty. O Firefox renderizou uma página local e abriu por Wayland. Brave Origin e Blanc criaram processos de renderização com seccomp ativo. O registro e as capturas estão em `out/pc-apps-release/desktop-tests/desktop-9u5v96ak/`. A ISO de 945 MiB passou pelo CD UEFI e pelo modo normal do Ventoy, com 8 GiB na VM. O cancelamento preservou o disco de destino e a instalação válida iniciou os dois slots com o NVMe vizinho intacto. Relatórios em `out/pc-apps-iso/tests/install-cagrlxdw/` e `out/pc-apps-iso/ventoy/install-jqfzqjq_/`.
+
+`make test` passou com 48 testes Python e cobertura de 80,1% em Go, 92,0% em Python e 97,2% em Shell. A prévia comprova o início dos aplicativos e do desktop. Áudio, portais de arquivos, desbloqueio por Noctalia e o teste físico no HP permanecem pendentes. [Comandos](TESTES.md#perfil-de-aplicativos-do-pc)

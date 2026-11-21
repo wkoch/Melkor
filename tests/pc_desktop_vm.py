@@ -2,6 +2,7 @@
 """Exercita login local, DRM, seatd e a abertura de um terminal via painel Wayland."""
 
 import argparse
+from contextlib import suppress
 import json
 import os
 from pathlib import Path
@@ -15,9 +16,10 @@ from types import SimpleNamespace
 from m1_dns_vm import BOOT, guest
 
 
-def desktop(console, qmp, run):
+def desktop(console, qmp, run, apps, chromium, umbriel):
     BOOT["login"](console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
-    for char in "melkor\nmelkor\nmelkor-desktop >/tmp/melkor-gui.log 2>&1\n":
+    session = "--umbriel " if umbriel else ""
+    for char in f"melkor\nmelkor\nmelkor-desktop {session}>/tmp/melkor-gui.log 2>&1\n":
         keys = {
             " ": ["spc"], "\n": ["ret"], "-": ["minus"], "/": ["slash"], ".": ["dot"],
             ">": ["shift", "dot"], "&": ["shift", "7"],
@@ -28,27 +30,75 @@ def desktop(console, qmp, run):
         guest(console, "for attempt in $(seq 1 20); do "
               'for device in /tmp/melkor-wayland.*/wayland-*; do [ -S "$device" ] && exit 0; done; '
               "sleep 1; done; cat /tmp/melkor-gui.log; exit 1")
-        guest(console, 'pid=$(pidof -s weston) && awk \'$1=="Uid:" && $2==1000 {ok=1} END{exit !ok}\' '
-              '"/proc/$pid/status" && grep -iq pixman /tmp/melkor-gui.log')
+        if umbriel:
+            guest(console, 'for attempt in $(seq 1 16); do '
+                  'for socket in /tmp/melkor-wayland.*/noctalia-wayland-*.sock; do '
+                  'test -S "$socket" && exit 0; done; '
+                  'sleep 1; done; cat /tmp/melkor-gui.log; exit 1')
+        else:
+            guest(console, 'pid=$(pidof -s weston) && awk \'$1=="Uid:" && $2==1000 {ok=1} END{exit !ok}\' '
+                  '"/proc/$pid/status" && grep -iq pixman /tmp/melkor-gui.log')
         time.sleep(1)
         panel = run / "01-desktop.ppm"
         qmp("screendump", filename=str(panel))
         with panel.open("rb") as image:
             assert image.readline().strip() == b"P6", "Formato inesperado no screendump do QEMU."
             width, height = map(int, image.readline().split())
-        qmp("input-send-event", events=[
-            {"type": "abs", "data": {"axis": axis, "value": 32767 * 16 // (extent - 1)}}
-            for axis, extent in (("x", width), ("y", height))
-        ])
-        for down in (True, False):
-            qmp("input-send-event", events=[{"type": "btn", "data": {"down": down, "button": "left"}}])
-        guest(console, "for attempt in $(seq 1 10); do pidof foot >/dev/null && exit 0; sleep 1; done; exit 1")
+        if umbriel:
+            qmp("send-key", keys=[{"type": "qcode", "data": key} for key in ("meta_l", "ret")])
+        else:
+            qmp("input-send-event", events=[
+                {"type": "abs", "data": {"axis": axis, "value": 32767 * 16 // (extent - 1)}}
+                for axis, extent in (("x", width), ("y", height))
+            ])
+            for down in (True, False):
+                qmp("input-send-event", events=[{"type": "btn", "data": {"down": down, "button": "left"}}])
+        terminal = "nu" if apps else "foot"
+        guest(console, f"for attempt in $(seq 1 12); do pidof {terminal} >/dev/null && exit 0; "
+              "sleep 1; done; cat /tmp/melkor-gui.log; exit 1")
         qmp("screendump", filename=str(run / "02-terminal.ppm"))
+        if apps:
+            test_firefox(console, qmp, run)
+        if chromium:
+            test_chromium(console, qmp, run)
     finally:
-        qmp("screendump", filename=str(run / "tela-final.ppm"))
+        with suppress(RuntimeError):
+            qmp("screendump", filename=str(run / "tela-final.ppm"))
 
 
-def run_test(image, run):
+def test_firefox(console, qmp, run):
+    guest(console, """/usr/bin/nu --no-config-file -c '[1 2 3] | math sum' | grep -Fx 6""")
+    launch = (
+        'for socket in /tmp/melkor-wayland.*/wayland-*; do test -S "$socket" && break; done; '
+        'export XDG_RUNTIME_DIR="${socket%/*}" WAYLAND_DISPLAY="${socket##*/}"; '
+    )
+    page = "'data:text/html,<title>Melkor Firefox</title><h1>Melkor Firefox ESR</h1>'"
+    guest(console, launch + "melkor-firefox --headless --screenshot /home/browser/site.png " + page +
+          ' > /tmp/melkor-firefox.log 2>&1 && test -s "$HOME/.local/share/melkor/firefox/site.png" '
+          '|| { cat /tmp/melkor-firefox.log; exit 1; }')
+    guest(console, launch + "melkor-firefox " + page + " >/tmp/melkor-firefox.log 2>&1 &")
+    guest(console, "for attempt in $(seq 1 15); do pidof firefox-esr >/dev/null && exit 0; "
+          "sleep 1; done; cat /tmp/melkor-firefox.log; exit 1")
+    time.sleep(2)
+    qmp("screendump", filename=str(run / "03-firefox.ppm"))
+
+
+def test_chromium(console, qmp, run):
+    for name, process in (("brave-origin", "brave"), ("blanc", "blanc")):
+        launch = ('for socket in /tmp/melkor-wayland.*/wayland-*; do test -S "$socket" && break; done; '
+                  'export XDG_RUNTIME_DIR="${socket%/*}" WAYLAND_DISPLAY="${socket##*/}"; ')
+        page = f"'data:text/html,<title>Melkor {name}</title><h1>Melkor {name}</h1>'"
+        guest(console, launch + f"melkor-{name} " + page + f" >/tmp/melkor-{name}.log 2>&1 &")
+        guest(console, f"for attempt in $(seq 1 18); do "
+              f'for pid in $(pidof {process}); do '
+              'if grep -aq -- "--type=renderer" "/proc/$pid/cmdline" && '
+              'awk \'$1=="Seccomp:" && $2==2 {ok=1} END{exit !ok}\' "/proc/$pid/status"; '
+              'then exit 0; fi; done; '
+              f"sleep 1; done; cat /tmp/melkor-{name}.log; exit 1")
+        qmp("screendump", filename=str(run / f"04-{name}.ppm"))
+
+
+def run_test(image, run, apps, chromium, umbriel):
     code, variables = BOOT["find_firmware"](SimpleNamespace(
         ovmf_code=Path(code) if (code := os.environ.get("OVMF_CODE")) else None,
         ovmf_vars=Path(variables) if (variables := os.environ.get("OVMF_VARS")) else None))
@@ -64,7 +114,8 @@ def run_test(image, run):
         monitor = Path(runtime) / "qmp.sock"
         def drive(path, options):
             return f"file={str(path).replace(',', ',,')},format=raw,{options}"
-        command = [qemu, "-machine", "q35", "-accel", accel, "-m", "1024", "-display", "none",
+        memory = "4096" if chromium else ("2048" if apps else "1024")
+        command = [qemu, "-machine", "q35", "-accel", accel, "-m", memory, "-display", "none",
                    "-serial", "stdio", "-monitor", "none", "-nic", "none", "-no-reboot",
                    "-qmp", f"unix:{monitor},server=on,wait=off",
                    "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
@@ -99,7 +150,7 @@ def run_test(image, run):
                         time.sleep(5)
                         qmp("screendump", filename=str(run / "00-boot.ppm"))
                         with BOOT["serial_console"](vm, log, 120) as console:
-                            desktop(console, qmp, run)
+                            desktop(console, qmp, run, apps, chromium, umbriel)
             finally:
                 vm.kill()
                 log.write(vm.stdout.read())
@@ -109,12 +160,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
     parser.add_argument("--log-dir", required=True, type=Path)
+    parser.add_argument("--apps", action="store_true")
+    parser.add_argument("--chromium", action="store_true")
+    parser.add_argument("--umbriel", action="store_true")
     args = parser.parse_args()
     args.log_dir.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="desktop-", dir=args.log_dir)).resolve()
     print(f"Evidências em {run}", flush=True)
-    run_test(args.image, run)
-    print("Login local, Weston como usuário comum e abertura do foot no painel verificados.")
+    run_test(args.image, run, args.apps, args.chromium, args.umbriel)
+    tested = "Alacritty com Nushell e Firefox ESR" if args.apps else "foot"
+    if args.chromium:
+        tested += ", Brave Origin e Blanc"
+    session = "Umbriel com Noctalia" if args.umbriel else "Weston"
+    print(f"Login local, {session} como usuário comum e abertura de {tested} verificados.")
 
 
 if __name__ == "__main__":

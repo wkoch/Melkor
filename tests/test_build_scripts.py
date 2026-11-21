@@ -43,6 +43,18 @@ script=$1
 shift
 source "$script" "$@"
 """)
+        cls.app = cls.wrapper("app", """test() {
+    case "$1" in
+        -x|-S) [[ ${TEST_APP:-} = yes ]] ;;
+        *) builtin test "$@" ;;
+    esac
+}
+exec() { printf '%s\n' "$*" > "$TEST_BOOT_LOG"; exit 0; }
+script=$1
+shift
+BASH_ARGV0=$script
+source "$script" "$@"
+""")
         cls.boot = cls.wrapper("boot", """mount() {
     printf 'mount %s\n' "$*" >> "$TEST_BOOT_LOG"
     return "${TEST_MOUNT_CODE:-0}"
@@ -84,7 +96,9 @@ blkid() {
 test() {
     if [[ $1 = -b ]]; then [[ $2 =~ ^/dev/vda[1-3]$ ]]; else builtin test "$@"; fi
 }
-source "$1"
+script=$1
+shift
+source "$script" "$@"
 """)
 
     @classmethod
@@ -260,6 +274,58 @@ source "$1"
                         MELKOR_RAUC_KEYRING=key, MELKOR_CHANNEL_PUBLIC_KEY=key)
         self.assertEqual((config / "revision").read_text(), "1\n")
         self.assertEqual((config / "channel.pem").read_text(), "chave de teste")
+        layer = self.out / "layer.tar.gz"
+        payload = self.out / "payload"
+        icon = payload / "usr/lib/firefox-esr/browser/chrome/icons/default/default32.png"
+        icon.parent.mkdir(parents=True)
+        icon.write_text("ícone")
+        weston = target / "etc/xdg/weston"
+        weston.mkdir(parents=True)
+        (weston / "weston.ini").write_text("[core]\n")
+        (weston / "melkor-firefox.ini").write_text("[launcher]\n")
+        (target / "etc/xdg/melkor").mkdir()
+        (target / "etc/xdg/melkor/firefox-policies.json").write_text("{}")
+        for browser in ("firefox", "brave-origin", "blanc"):
+            (target / f"etc/xdg/melkor/{browser}.desktop").write_text("[Desktop Entry]\n")
+        (weston / "melkor-chromium.ini").write_text("[launcher]\n")
+        for icon_path in ("opt/brave.com/brave-origin/product_logo_32.png",
+                          "opt/blanc/usr/share/icons/hicolor/1024x1024/apps/blanc.png"):
+            browser_icon = payload / icon_path
+            browser_icon.parent.mkdir(parents=True)
+            browser_icon.write_text("ícone")
+        subprocess.run(["tar", "-czf", layer, "-C", payload, "."], check=True)
+        self.run_script(script, target, HOST_DIR=host, MELKOR_PC_DESKTOP_LAYER=layer,
+                        MELKOR_PC_CHROMIUM_LAYER=layer, MELKOR_PC_SESSION_LAYER=layer)
+        self.assertEqual((weston / "weston.ini").read_text(), "[core]\n[launcher]\n[launcher]\n")
+        self.assertEqual((target / "usr/share/melkor/firefox.png").read_text(), "ícone")
+        self.assertEqual((target / "usr/share/melkor/blanc.png").read_text(), "ícone")
+
+    def test_lancadores_pc_preservam_shell_e_isolam_o_navegador(self):
+        binaries = self.project / "core/board/pc/rootfs-overlay/usr/bin"
+        self.run_script(self.app, binaries / "melkor-terminal")
+        self.assertEqual(self.boot_log.read_text(), "/usr/bin/foot\n")
+        self.run_script(self.app, binaries / "melkor-terminal", TEST_APP="yes")
+        self.assertIn("alacritty --config-file /etc/xdg/alacritty/melkor.toml -e /usr/bin/nu", self.boot_log.read_text())
+        self.run_script(self.app, binaries / "melkor-firefox", code=1)
+        self.run_script(self.app, binaries / "melkor-firefox", TEST_APP="yes", HOME=self.out,
+                        XDG_RUNTIME_DIR="/run/session", WAYLAND_DISPLAY="wayland-1")
+        args = self.boot_log.read_text()
+        self.assertIn("--unshare-user --unshare-pid --unshare-ipc --unshare-uts", args)
+        self.assertIn("--ro-bind /run/session/wayland-1 /run/wayland", args)
+        self.assertIn("--ro-bind /etc/resolv.conf /etc/resolv.conf", args)
+        self.assertNotIn("--no-sandbox", args)
+        self.run_script(self.app, binaries / "melkor-browser", code=2)
+        self.run_script(self.app, binaries / "melkor-session-exec", code=2)
+        self.run_script(self.app, binaries / "melkor-session-exec", "noctalia", "--version")
+        self.assertIn("/usr/bin/noctalia --version", self.boot_log.read_text())
+        for name, program in (("brave-origin", "/opt/brave.com/brave-origin/brave-origin"),
+                              ("blanc", "/opt/blanc/AppRun")):
+            self.run_script(self.app, binaries / f"melkor-{name}", TEST_APP="yes", HOME=self.out,
+                            XDG_RUNTIME_DIR="/run/session", WAYLAND_DISPLAY="wayland-1")
+            args = self.boot_log.read_text()
+            self.assertIn(f"/share/melkor/{name}", args)
+            self.assertIn(f"{program} --ozone-platform=wayland", args)
+            self.assertNotIn("--no-sandbox", args)
 
     def test_init_live_exige_devs_em_memoria_antes_de_iniciar_dinit(self):
         init = self.project / "core/board/live/rootfs-overlay/init"
@@ -304,6 +370,7 @@ source "$1"
         self.assertIn("melkor-storage credenciais", log)
         self.assertIn("mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp", log)
         self.assertIn("/persist/melkor /home/melkor", log)
+        self.assertIn("mount -t tmpfs -o mode=1777,nosuid,nodev,noexec tmpfs /dev/shm", log)
         self.assertIn("install -d -m 0700 -o root -g root /persist/iwd", log)
         self.assertIn("/run/melkor/esp-device /run/melkor/esp", log)
 
@@ -326,6 +393,10 @@ source "$1"
             "dbus-run-session /tmp/melkor-simulado seatd -- weston --renderer=pixman",
             "rm -rf -- /tmp/melkor-simulado",
         ])
+        self.boot_log.write_text("")
+        self.run_script(self.boot, file, "--umbriel")
+        self.assertIn("melkor-session-exec umbriel -c /etc/xdg/melkor/umbriel.toml", self.boot_log.read_text())
+        self.run_script(self.boot, file, "--invalido", code=2)
 
     def test_rauc_monta_so_dispositivos_inequivocos(self):
         setup = self.project / "core/board/m1/rootfs-overlay/usr/libexec/melkor-rauc-setup"

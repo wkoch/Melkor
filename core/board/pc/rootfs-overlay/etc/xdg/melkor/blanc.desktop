@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Blanc
+Exec=/usr/bin/melkor-blanc %U
+Icon=/usr/share/melkor/blanc.png
+Categories=Network;WebBrowser;

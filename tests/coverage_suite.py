@@ -37,7 +37,7 @@ def shell_coverage(directory):
     scripts = {}
     for folder in ("scripts", "core"):
         for file in (ROOT / folder).rglob("*"):
-            if not file.is_file():
+            if file.is_symlink() or not file.is_file():
                 continue
             with file.open("rb") as stream:
                 header = stream.readline(256)

@@ -36,10 +36,10 @@ def boot_ventoy(monitor, mode):
 
 
 @contextmanager
-def machine(qemu, accel, code, variables, disk, neighbor, log_path, sector, iso=None, ventoy=None, mode="normal"):
+def machine(qemu, accel, code, variables, disk, neighbor, log_path, sector, iso=None, ventoy=None, mode="normal", memory=None):
     def drive(path, options):
         return f"file={str(path).replace(',', ',,')},format=raw,{options}"
-    command = [qemu, "-machine", "q35", "-accel", accel, "-m", "3072" if sector == 4096 else "2048",
+    command = [qemu, "-machine", "q35", "-accel", accel, "-m", str(memory or (3072 if sector == 4096 else 2048)),
                "-display", "none", "-serial", "stdio",
                "-nic", "none", "-no-reboot", "-vga", "std",
                "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
@@ -118,7 +118,7 @@ def install(vm, log, deadline, disk, passwords, sector):
             raise RuntimeError(result.decode(errors="replace").splitlines()[-1])
 
 
-def check_installation(iso, run, sector, ventoy=None, mode="normal"):
+def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None):
     if ventoy:
         check_ventoy_iso(iso, ventoy)
     qemu = os.environ.get("QEMU_SYSTEM") or shutil.which("qemu-system-x86_64", path=BOOT["SYSTEM_PATH"])
@@ -142,7 +142,7 @@ def check_installation(iso, run, sector, ventoy=None, mode="normal"):
     accel = os.environ.get("QEMU_ACCEL", "tcg")
     passwords = tuple(secrets.token_hex(16).encode("ascii") for _ in range(2))
     with machine(qemu, accel, code, variables, disk, neighbor, run / "serial-install.log",
-                 sector, iso, ventoy, mode) as session:
+                 sector, iso, ventoy, mode, memory) as session:
         install(*session, 300, disk, passwords, sector)
     if any(password in (run / "serial-install.log").read_bytes() for password in passwords):
         raise RuntimeError("Uma senha foi registrada na saída do instalador.")
@@ -173,6 +173,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("iso", type=Path)
     parser.add_argument("--log-dir", required=True, type=Path)
+    parser.add_argument("--memory-mib", type=int)
     parser.add_argument("--sector-size", choices=(512, 4096), type=int, default=512)
     parser.add_argument("--ventoy-drive", type=Path, help="Arquivo regular do pendrive virtual contendo apenas esta ISO.")
     parser.add_argument("--ventoy-mode", choices=("normal", "grub2"), default="normal")
@@ -182,7 +183,7 @@ def main():
     args.log_dir.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="install-", dir=args.log_dir)).resolve()
     print(f"Evidências em {run}", flush=True)
-    check_installation(args.iso.resolve(strict=True), run, args.sector_size, args.ventoy_drive, args.ventoy_mode)
+    check_installation(args.iso.resolve(strict=True), run, args.sector_size, args.ventoy_drive, args.ventoy_mode, args.memory_mib)
     print("Instalação, cancelamento, vizinho intacto e primeiro boot nos dois slots verificados.")
 
 

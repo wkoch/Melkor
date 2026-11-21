@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Brave Origin
+Exec=/usr/bin/melkor-brave-origin %U
+Icon=/usr/share/melkor/brave-origin.png
+Categories=Network;WebBrowser;
