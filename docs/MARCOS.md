@@ -189,4 +189,8 @@ O alvo `pc` exercita a distribuição de espaço em disco, a atualização do co
 
 Em um disco de laboratório criado com `make pc-disk OUT=out/pc-credentials-lab PC_CREDENTIALS=…`, `make test-pc-disk` recusou a senha antiga e verificou a proteção das credenciais, a sessão comum e o `su -` com senha separada nos dois slots. O cenário usou o SquashFS anterior com o novo executável e o script de persistência empacotados na VM. Evidências em `out/pc-credentials-lab/tests/boot-0kh1y6vq/`.
 
+O build limpo `make image BOARD=pc OUT=out/pc-clean` gerou o SquashFS, o kernel e o GRUB. `sha256sum --check` confirmou os três arquivos. A sessão Weston e o terminal foot passaram novamente em `make test-pc-desktop OUT=out/pc-clean`. O teste de DoH passou sobre Ethernet virtual em IPv4 e IPv6 com o novo disco. A validação do disco provisionado em `out/pc-clean-auth` repetiu a recusa da senha antiga, a autenticação separada de root, os dois boots por NVMe, o swap e a leitura do documento em B. Evidências em `out/pc-clean-auth/tests/boot-t7umowp3/`. A suíte final registrou 37 testes Python e cobertura de 84,8% em Go, 93,3% em Python e 96,9% em Shell.
+
+O mesmo core, reempacotado com o certificado público de laboratório, repetiu os três cenários de `make test-update BOARD=pc` em KVM. As credenciais de root vieram do volume persistente. O RAUC rejeitou os três bundles de teste inválidos, promoveu a candidata saudável, voltou ao slot A após falha de confirmação e aceitou nova instalação após a interrupção de escrita. Evidências em `out/pc-clean-rauc-evidence/`.
+
 A instalação em disco real, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam em desenvolvimento.
