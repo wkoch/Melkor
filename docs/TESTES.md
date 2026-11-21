@@ -78,6 +78,14 @@ make test-live-wifi HWSIM="$linux/drivers/net/wireless/virtual/mac80211_hwsim.ko
 
 O executor monta uma camada de initramfs descartável com dois rádios e inicia a VM sem interfaces QEMU ligadas ao host. A conta comum cria um ponto de acesso WPA2 em um rádio, associa o segundo com `iwctl` e confirma o SSID com `iw`. O módulo fica fora da mídia distribuída. O teste de endereçamento e DoH usa um adaptador Ethernet distinto, com `make test-dns BOARD=live` e, em um host com IPv6, `make test-dns BOARD=live DNS_IPV6_ONLY=1`.
 
+## Instalação de disco inteiro
+
+Use `make check-env BOARD=installer` para conferir o cache. As entradas de build para saídas novas são `make image BOARD=pc OUT=out/pc` e `make image BOARD=installer OUT=out/installer`. Com os dois builds disponíveis, `make installer-iso PC_OUT=out/pc OUT=out/installer` usa o GRUB e o xorriso do build do instalador, além de `cpio` e `mkfs.vfat` do contêiner.
+
+`make test-installer OUT=out/installer` cria dois arquivos NVMe descartáveis e inicia a ISO como CD em QEMU/OVMF. O teste verifica a recusa de uma confirmação errada antes de gravar, fornece senhas descartáveis, confere a GPT completa e reinicia a VM sem a mídia por A e por B. O SHA-256 de todo o disco vizinho é comparado antes e depois. `TEST_SECTOR_SIZE=4096` usa um NVMe 4Kn e requer uma versão de `sfdisk` com `--sector-size` no host de teste.
+
+Para a variante Ventoy, use `python3 tests/installer_vm.py ISO --log-dir DIRETÓRIO --ventoy-drive PENDRIVE_VIRTUAL` no contêiner. O arquivo regular do pendrive virtual precisa conter apenas `melkor-installer.iso` na partição de dados FAT. O executor usa `mtype` para comparar o SHA-256 desse arquivo ao da ISO informada e abre o pendrive virtual somente para leitura. `--ventoy-mode grub2` seleciona GRUB2.
+
 ## Protótipo de disco PC
 
 Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` para gerar um arquivo regular com GPT e 16 GiB lógicos. O gerador exige Go no host, além de `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools` e `grub-editenv`. Os testes unitários exercitam os limites do particionamento, a validação do SquashFS e a preservação de arquivos preexistentes. `make test-pc-disk` usa uma cópia de trabalho com QEMU e OVMF. Ele confirma boot UEFI pelos dois slots no mesmo NVMe virtual, o conteúdo do home e a ativação do swap de 4 GiB. `make test-pc-desktop` usa outra cópia e verifica login no console de vídeo, Weston como usuário comum e abertura de foot pelo painel.

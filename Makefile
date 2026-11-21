@@ -2,6 +2,7 @@ BOARD ?= m0
 OUT ?= out/$(BOARD)
 TEST_PYTHON ?= python3
 PC_DISK_GIB ?= 16
+PC_OUT ?= out/pc
 
 # No host Bazzite, as ferramentas de build e de teste ficam no contêiner melkor-build.
 # No CI, sem distrobox, os comandos rodam diretamente.
@@ -11,7 +12,7 @@ BUILD_ENV ?= distrobox enter -n melkor-build --
 endif
 endif
 
-.PHONY: env check-env image test-boot check-m1 bundle-m1 bundle-pc test-update test-dns test-live-wifi tools test test-packages pc-disk test-pc-disk test-pc-desktop
+.PHONY: env check-env image installer-iso test-installer test-boot check-m1 bundle-m1 bundle-pc test-update test-dns test-live-wifi tools test test-packages pc-disk test-pc-disk test-pc-desktop
 env:
 	./scripts/prepare-env.sh prepare "$(BOARD)"
 
@@ -20,6 +21,14 @@ check-env:
 
 image:
 	$(BUILD_ENV) env MELKOR_RAUC_KEYRING="$(MELKOR_RAUC_KEYRING)" MELKOR_LAB_ROOT_HASH_FILE="$(MELKOR_LAB_ROOT_HASH_FILE)" ./scripts/build-image.sh "$(OUT)" "$(BOARD)"
+
+installer-iso: BOARD = installer
+installer-iso:
+	$(BUILD_ENV) python3 scripts/installer-iso.py "$(OUT)" "$(PC_OUT)" "$(OUT)/melkor-installer.iso"
+
+test-installer: BOARD = installer
+test-installer:
+	$(BUILD_ENV) python3 tests/installer_vm.py "$(OUT)/melkor-installer.iso" --log-dir "$(OUT)/tests" $(if $(TEST_SECTOR_SIZE),--sector-size "$(TEST_SECTOR_SIZE)")
 
 test-boot:
 	$(BUILD_ENV) python3 scripts/test-boot.py "$(if $(filter pc,$(BOARD)),$(OUT)/melkor-pc.img,$(OUT)/build/images/melkor-$(BOARD).img)" --log-dir "$(OUT)/tests" \

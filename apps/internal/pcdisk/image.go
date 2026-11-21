@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -23,6 +24,10 @@ type ImageInput struct {
 }
 
 func CreateImage(ctx context.Context, input ImageInput) (Layout, error) {
+	return createImage(ctx, input, 512, true)
+}
+
+func createImage(ctx context.Context, input ImageInput, sector uint64, fakeRoot bool) (Layout, error) {
 	if input.SizeBytes > uint64(1<<63-1) {
 		return Layout{}, fmt.Errorf("imagem de disco excede o tamanho suportado")
 	}
@@ -41,7 +46,7 @@ func CreateImage(ctx context.Context, input ImageInput) (Layout, error) {
 	if err != nil {
 		return Layout{}, err
 	}
-	layout, err := Plan(input.SizeBytes, 512, uint64(info.Size()))
+	layout, err := Plan(input.SizeBytes, sector, uint64(info.Size()))
 	if err != nil {
 		return Layout{}, err
 	}
@@ -58,7 +63,7 @@ func CreateImage(ctx context.Context, input ImageInput) (Layout, error) {
 	if err := disk.Truncate(int64(input.SizeBytes)); err != nil {
 		return Layout{}, err
 	}
-	if err := run(ctx, layout.Sfdisk(), "sfdisk", "--no-reread", "--no-tell-kernel", disk.Name()); err != nil {
+	if err := partitionImage(ctx, disk.Name(), layout); err != nil {
 		return Layout{}, err
 	}
 	for index, source := range []*os.File{esp, core, core} {
@@ -81,9 +86,13 @@ func CreateImage(ctx context.Context, input ImageInput) (Layout, error) {
 		if err != nil {
 			return Layout{}, err
 		}
-		program = "fakeroot"
-		mkfs = append([]string{"--", "/bin/sh", "-ec", `seed=$1; shift; chown -R 0:0 "$seed"; exec mke2fs -d "$seed" "$@"`,
-			"melkor-disco", seed}, mkfs...)
+		if fakeRoot {
+			program = "fakeroot"
+			mkfs = append([]string{"--", "/bin/sh", "-ec", `seed=$1; shift; chown -R 0:0 "$seed"; exec mke2fs -d "$seed" "$@"`,
+				"melkor-disco", seed}, mkfs...)
+		} else {
+			mkfs = append([]string{"-d", seed}, mkfs...)
+		}
 	}
 	if err := run(ctx, "", program, mkfs...); err != nil {
 		return Layout{}, err
@@ -98,6 +107,28 @@ func CreateImage(ctx context.Context, input ImageInput) (Layout, error) {
 		return Layout{}, err
 	}
 	return layout, nil
+}
+
+var loopName = regexp.MustCompile(`^/dev/loop[0-9]+$`)
+
+func partitionImage(ctx context.Context, file string, layout Layout) (err error) {
+	target := file
+	if layout.SectorSize == 4096 {
+		result, err := exec.CommandContext(ctx, "losetup", "--find", "--show", "--sector-size", "4096", file).Output()
+		if err != nil {
+			return fmt.Errorf("configurar setor de 4096 bytes na imagem temporária: %w", err)
+		}
+		target = strings.TrimSpace(string(result))
+		if !loopName.MatchString(target) {
+			return fmt.Errorf("losetup retornou um dispositivo inesperado")
+		}
+		defer func() {
+			if drop := run(context.Background(), "", "losetup", "--detach", target); err == nil {
+				err = drop
+			}
+		}()
+	}
+	return run(ctx, layout.Sfdisk(), "sfdisk", "--no-reread", "--no-tell-kernel", target)
 }
 
 func stageCore(input ImageInput, work string) (*os.File, error) {
@@ -171,11 +202,11 @@ func createESP(ctx context.Context, input ImageInput, layout Layout, work string
 	if err != nil {
 		return nil, err
 	}
-	if err := esp.Truncate(ESPSize); err != nil {
+	if err := esp.Truncate(int64(layout.Partitions[0].Size * layout.SectorSize)); err != nil {
 		esp.Close()
 		return nil, err
 	}
-	if err := run(ctx, "", "mkfs.vfat", "-F", "32", esp.Name()); err != nil {
+	if err := run(ctx, "", "mkfs.vfat", "-F", "32", "-S", fmt.Sprint(layout.SectorSize), esp.Name()); err != nil {
 		esp.Close()
 		return nil, err
 	}

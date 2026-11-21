@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 import importlib.util
 import io
@@ -24,6 +25,7 @@ def script(name):
 boot = script("test-boot")
 image = script("check-m1-image")
 bundle = script("bundle-m1")
+installer = script("installer-iso")
 
 LOGIN = b"\rmelkor login: \n\rPassword: \nmelkor$ \n"
 PROBE = b"M0-ID=melkor\nM0-PID1=dinit\nM0-LOGIN=melkor\nM0-UEFI=yes\nM0-ROOT=squashfs,ro\nM0-END\n"
@@ -31,6 +33,53 @@ MENU = b"Melkor Linux M1 - slot B\nPress enter to boot the selected OS\n*Melkor 
 LIVE = (b"LIVE-VERSION=live\nLIVE-USER=ok\nLIVE-DISPLAY=ok\nLIVE-DEVICES=ok\n"
         b"LIVE-PERMISSIONS=ok\nLIVE-TOOLS=ok\nLIVE-RAM=ok\nLIVE-HOME=ok\nLIVE-END\n"
         b"LIVE-FIRMWARE=ok\nLIVE-REGDB=ok\nLIVE-IWD=ok\nLIVE-WIFI-END\n")
+
+
+class InstallerMediaTest(unittest.TestCase):
+    def test_valida_manifestos_antes_de_montar_iso(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            kernel = root / "build/images/bzImage"
+            kernel.parent.mkdir(parents=True)
+            kernel.write_bytes(b"kernel")
+            (root / "SHA256SUMS").write_text(f"{hashlib.sha256(b'kernel').hexdigest()}  bzImage\n")
+            self.assertEqual(installer.asset(root, "bzImage")[0], kernel)
+            kernel.write_bytes(b"adulterado")
+            with patch.object(installer.subprocess, "run") as run, self.assertRaisesRegex(ValueError, "SHA-256"):
+                installer.prepare_media(root, root, root / "install.iso")
+            run.assert_not_called()
+
+    def test_midia_monta_payload_grub_e_publica_sem_sobrescrever(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for mode, files in {
+                "installer": {"bzImage": b"kernel", "rootfs.cpio.gz": b"initramfs"},
+                "pc": {"rootfs.squashfs": b"core", "efi-part/EFI/BOOT/bootx64.efi": b"grub-pc"},
+            }.items():
+                output = root / mode
+                hashes = []
+                for name, contents in files.items():
+                    path = output / "build/images" / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(contents)
+                    hashes.append(f"{hashlib.sha256(contents).hexdigest()}  {name}\n")
+                (output / "SHA256SUMS").write_text("".join(hashes))
+
+            def tool(args, **options):
+                if args[0] == "cpio":
+                    self.assertIn(b"melkor/core.sha256", options["input"])
+                    options["stdout"].write(b"payload")
+                elif Path(args[0]).name == "xorriso":
+                    self.assertIn("MELKOR_INSTALL_x86_64", args)
+                    self.assertTrue((Path(args[-1]) / "rootfs.cpio.gz").read_bytes().startswith(b"initramfs"))
+                    Path(args[args.index("-o") + 1]).write_bytes(b"iso")
+
+            output = root / "install.iso"
+            with patch.object(installer.subprocess, "run", side_effect=tool):
+                installer.prepare_media(root / "installer", root / "pc", output)
+                with self.assertRaises(FileExistsError):
+                    installer.prepare_media(root / "installer", root / "pc", output)
+            self.assertEqual(output.read_bytes(), b"iso")
 
 
 class BundleTest(unittest.TestCase):

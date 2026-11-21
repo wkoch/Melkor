@@ -46,6 +46,14 @@ Ao provisionar contas, o gerador grava os hashes de root e de `melkor` em um dir
 
 Para exercitar vídeo e entrada no PC, o core de laboratório inclui eudev 3.2.14, seatd 0.9.1, Weston 14.0.1 e foot 1.16.2, das receitas do Buildroot fixado. A sessão começa como usuário comum e usa DRM com Pixman. O módulo AMDGPU e o firmware do kernel entram no core para os testes do HP. A sessão prevista para uso diário integra Umbriel e Noctalia. O alvo PC atual usa credenciais de laboratório e é preparado em um arquivo regular para QEMU. [Requisitos de empacotamento do Umbriel](https://github.com/noctalia-dev/umbriel/blob/main/PACKAGING.md)
 
+### Mídia de instalação do PC
+
+O alvo `installer` gera uma mídia UEFI separada que inclui kernel, dinit e `melkor-instalar`. O gerador da ISO compara o SHA-256 dos componentes dos dois builds. O SquashFS do PC, o GRUB do disco e seu modelo de configuração ficam dentro do initramfs. A instalação usa esses arquivos em RAM e funciona sem conexão de rede ou montagem da partição de dados do Ventoy.
+
+O instalador lista discos internos identificados pelo eudev e pede confirmação com o ID escolhido. A imagem temporária usa a capacidade e o tamanho de setor do destino e recebe as duas credenciais antes da gravação. A abertura exclusiva do dispositivo recusa volumes em uso. O instalador reconfirma a sequência do disco, a capacidade e o setor lógico pelo descritor aberto antes de invalidar a GPT anterior. A GPT nova só é publicada após a cópia e a sincronização dos dados. [Abertura exclusiva de dispositivos de bloco no Linux](https://man7.org/linux/man-pages/man2/open.2.html)
+
+O instalador reutiliza util-linux 2.40.4 e as receitas fixadas de e2fsprogs 1.47.2, dosfstools 4.2 e GNU Mtools 4.0.48 do Buildroot. Esses formatadores entram na mídia dedicada. A ESP tem 128 MiB para setores de 512 bytes e 512 MiB para 4Kn, para acomodar FAT32. Um loop de setor lógico de 4096 bytes é usado exclusivamente na imagem intermediária 4Kn e removido logo após escrever a GPT.
+
 ### Rede e DNS do core
 
 O dinit ativa a interface de loopback e supervisiona o `dhcpcd` 10.5.2, que configura endereços e rotas com separação de privilégios e guarda as concessões em `/run`. O cliente roda com os hooks de DHCP desativados. O `/etc/resolv.conf` faz parte do SquashFS de cada slot e aponta para o resolvedor de loopback.

@@ -9,8 +9,8 @@ project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 board=${2:-m0}
 case "$board" in
     m0|m1|pc) rootfs_option=BR2_TARGET_ROOTFS_SQUASHFS ;;
-    live) rootfs_option=BR2_TARGET_ROOTFS_CPIO_GZIP ;;
-    *) echo "Alvo desconhecido: $board. Use BOARD=m0, m1, live ou pc." >&2; exit 2 ;;
+    live|installer) rootfs_option=BR2_TARGET_ROOTFS_CPIO_GZIP ;;
+    *) echo "Alvo desconhecido: $board. Use BOARD=m0, m1, live, pc ou installer." >&2; exit 2 ;;
 esac
 output=$(realpath -m -- "${1:-out/$board}")
 cache="$project/out/dl"
@@ -75,6 +75,7 @@ images=("melkor-$board.img")
 case "$board" in
     live) images+=(melkor-live.iso) ;;
     pc) images=(rootfs.squashfs bzImage efi-part/EFI/BOOT/bootx64.efi) ;;
+    installer) images=(rootfs.cpio.gz bzImage) ;;
 esac
 sha256sum "${images[@]}" > "$output/SHA256SUMS"
 printf 'Imagem gerada em %s\n' "${images[@]/#/$PWD/}"

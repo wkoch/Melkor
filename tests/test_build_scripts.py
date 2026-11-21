@@ -45,6 +45,9 @@ source "$script" "$@"
     return "${TEST_MOUNT_CODE:-0}"
 }
 hostname() { printf 'hostname %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+cat() {
+    if [[ $1 = /proc/cmdline ]]; then printf '%s\n' "${TEST_CMDLINE:-}"; else command cat "$@"; fi
+}
 melkor-storage() {
     printf 'melkor-storage %s\n' "$*" >> "$TEST_BOOT_LOG"
     return "${TEST_CREDENTIALS_CODE:-0}"
@@ -120,7 +123,7 @@ source "$1"
 
     def test_build_gera_evidencias_para_cada_alvo(self):
         for board, source in (("m0", "https://example.invalid/buildroot.git"),
-                              ("m1", str(self.bundle)), ("live", str(self.bundle))):
+                              ("m1", str(self.bundle)), ("live", str(self.bundle)), ("installer", str(self.bundle))):
             with self.subTest(board=board):
                 override = {"MELKOR_BUILDROOT_URL": source} if board == "m0" else {}
                 if not override:
@@ -128,7 +131,8 @@ source "$1"
                 self.run_script(self.scripts / "build-image.sh", f"out/{board}", board, **override)
                 self.assertTrue(any(command[-2] == source for command in self.commands() if "fetch" in command))
                 build = self.out / board
-                digest = hashlib.sha256((build / "build/images" / f"melkor-{board}.img").read_bytes()).hexdigest()
+                name = "rootfs.cpio.gz" if board == "installer" else f"melkor-{board}.img"
+                digest = hashlib.sha256((build / "build/images" / name).read_bytes()).hexdigest()
                 self.assertEqual((build / "SHA256SUMS").read_text().split()[0], digest)
                 if board == "live":
                     self.assertEqual(len((build / "SHA256SUMS").read_text().splitlines()), 2)
@@ -239,6 +243,15 @@ source "$1"
         self.boot_log.write_text("")
         self.run_script(self.boot, init)
         self.assertEqual(self.boot_log.read_text().splitlines()[-1], "/sbin/dinit")
+
+    def test_instalador_seleciona_a_tela_ou_o_console_serial(self):
+        script = self.project / "core/board/installer/rootfs-overlay/usr/libexec/melkor-installer-console"
+        self.run_script(self.boot, script, TEST_CMDLINE="quiet console=tty0")
+        self.run_script(self.boot, script, TEST_CMDLINE="quiet melkor.serial=1")
+        self.assertEqual(self.boot_log.read_text().splitlines(), [
+            "/sbin/getty -n -l /usr/bin/melkor-instalar 38400 tty1 linux",
+            "/sbin/getty -L -n -l /usr/bin/melkor-instalar 115200 ttyS0 vt100",
+        ])
 
     def test_dbus_live_prepara_identidade_antes_de_abrir_o_socket(self):
         script = self.project / "core/board/live/rootfs-overlay/usr/libexec/melkor-system-bus"

@@ -21,6 +21,12 @@ Na unidade de referência, a placa Wi-Fi é uma Intel AX200 (`8086:2723`). Quand
 dmesg | grep -Ei 'iwlwifi|iwlmvm|01:00[.]0|rfkill|regulatory'
 ```
 
+## Instalação de disco inteiro em laboratório
+
+O alvo `installer` prepara o disco sem rede. A opção **Instalar Melkor** abre o console local dedicado. A tela exibe modelo, capacidade, setor lógico e ID persistente dos discos elegíveis. A confirmação `APAGAR <ID>` autoriza apagar todas as partições do disco escolhido. Depois dela, o instalador pede e confirma a senha do usuário `melkor` e uma senha distinta para root.
+
+Ao concluir, reinicie sem a mídia e entre com a conta comum. Use `su -` para entrar na sessão administrativa. O teste atual cobre o provisionamento no NVMe virtual e a sessão provisória Weston. A instalação no HP e o perfil final de aplicativos fazem parte da validação da release.
+
 ## Decisões
 
 | Área | Padrão |

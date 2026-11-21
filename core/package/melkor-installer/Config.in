@@ -1,0 +1,5 @@
+config BR2_PACKAGE_MELKOR_INSTALLER
+	bool "melkor-installer"
+	depends on BR2_PACKAGE_HOST_GO_TARGET_ARCH_SUPPORTS
+	help
+	  Whole-disk installer for the dedicated Melkor boot image.

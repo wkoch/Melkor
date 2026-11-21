@@ -12,6 +12,7 @@ const (
 
 	MinimumDisk = 12 * GiB
 	ESPSize     = 128 * MiB
+	espSize4Kn  = 512 * MiB
 	SlotSize    = 2 * GiB
 	SwapSize    = 4 * GiB
 
@@ -45,6 +46,10 @@ func Plan(diskBytes, sectorSize, coreBytes uint64) (Layout, error) {
 		return Layout{}, fmt.Errorf("o tamanho do core deve caber em um slot de %d GiB", SlotSize/GiB)
 	}
 	layout := Layout{DiskUUID: uuid(), SectorSize: sectorSize}
+	esp := uint64(ESPSize)
+	if sectorSize == 4096 {
+		esp = espSize4Kn
+	}
 	start := uint64(MiB) / sectorSize
 	end := (diskBytes/MiB - 1) * MiB / sectorSize
 	for index, entry := range [4]struct {
@@ -52,10 +57,10 @@ func Plan(diskBytes, sectorSize, coreBytes uint64) (Layout, error) {
 		kind string
 		size uint64
 	}{
-		{"esp", espType, ESPSize / sectorSize},
+		{"esp", espType, esp / sectorSize},
 		{"core-a", linuxType, SlotSize / sectorSize},
 		{"core-b", linuxType, SlotSize / sectorSize},
-		{"persist", linuxType, end - start - (ESPSize+2*SlotSize)/sectorSize},
+		{"persist", linuxType, end - start - (esp+2*SlotSize)/sectorSize},
 	} {
 		layout.Partitions[index] = Partition{Name: entry.name, Type: entry.kind, UUID: uuid(), Start: start, Size: entry.size}
 		start += entry.size

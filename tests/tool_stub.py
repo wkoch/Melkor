@@ -25,7 +25,8 @@ elif tool == "make":
         options = [
             "BR2_TOOLCHAIN_BUILDROOT_MUSL", "BR2_GCC_VERSION_14_X", "BR2_INIT_NONE",
             "BR2_PACKAGE_DINIT", "BR2_TARGET_GRUB2_X86_64_EFI",
-            "BR2_TARGET_ROOTFS_CPIO_GZIP" if args[-1] == "melkor_live_defconfig" else "BR2_TARGET_ROOTFS_SQUASHFS",
+            "BR2_TARGET_ROOTFS_CPIO_GZIP" if args[-1] in ("melkor_live_defconfig", "melkor_installer_defconfig")
+            else "BR2_TARGET_ROOTFS_SQUASHFS",
             "BR2_DOWNLOAD_FORCE_CHECK_HASHES",
         ]
         (build / ".config").write_text("".join(f"{name}=y\n" for name in options
@@ -45,6 +46,9 @@ elif tool == "make":
         (build / "images" / f"melkor-{board}.img").write_text("disco virtual")
         if board == "live":
             (build / "images/melkor-live.iso").write_text("mídia óptica virtual")
+        if board == "installer":
+            (build / "images/bzImage").write_text("kernel simulado")
+            (build / "images/rootfs.cpio.gz").write_text("initramfs simulado")
         tools = build / "host/bin"
         tools.mkdir(parents=True)
         for name in ("gcc", "ld", "readelf"):

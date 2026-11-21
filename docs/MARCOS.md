@@ -193,4 +193,12 @@ O build limpo `make image BOARD=pc OUT=out/pc-clean` gerou o SquashFS, o kernel 
 
 O mesmo core, reempacotado com o certificado público de laboratório, repetiu os três cenários de `make test-update BOARD=pc` em KVM. As credenciais de root vieram do volume persistente. O RAUC rejeitou os três bundles de teste inválidos, promoveu a candidata saudável, voltou ao slot A após falha de confirmação e aceitou nova instalação após a interrupção de escrita. Evidências em `out/pc-clean-rauc-evidence/`.
 
-A instalação em disco real, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam em desenvolvimento.
+### Instalação offline pela ISO
+
+A mídia dedicada empacota o core PC e prepara uma GPT pelo tamanho e pelo setor lógico do disco selecionado. O fluxo pede confirmação pelo ID estável e provisiona as duas contas antes de abrir o destino para gravação. A ISO foi validada com o NVMe que recebe o sistema e outro NVMe gravável. Os testes comparam os hashes do vizinho e iniciam os dois slots com a mídia removida. A instalação física no HP, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam pendentes.
+
+`make check-env BOARD=installer` confirmou o cache offline. A mídia de laboratório usou a toolchain do build do PC, com reinstalação dos pacotes selecionados em uma raiz vazia e recompilação do util-linux, kmod e eudev. `make installer-iso OUT=out/installer-clean PC_OUT=out/pc-clean-auth` conferiu os arquivos dos dois builds e produziu a ISO. O catálogo El Torito contém a entrada UEFI, com a imagem EFI de 16 MiB.
+
+`make test` passou com 40 testes Python e cobertura de 80,7% em Go, 92,4% em Python e 96,3% em Shell. [Roteiro de validação](TESTES.md#instalação-de-disco-inteiro)
+
+A mesma ISO passou pela instalação offline em QEMU 11.1.3 com OVMF e TCG, como CD UEFI com setores lógicos de 512 bytes, pelo modo normal do Ventoy 1.1.18 com 512 bytes e pelo modo GRUB2 com 4096 bytes. Em cada um, a confirmação inválida preservou o destino. A instalação válida fez a GPT até a reserva final, protegeu as senhas e chegou ao login nos dois slots, com swap ativo e o mesmo documento. O disco vizinho de 13 GiB manteve o SHA-256 integral. Os relatórios estão em `out/installer-clean/evidence/`.
