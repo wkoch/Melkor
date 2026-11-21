@@ -26,10 +26,17 @@ fi
 umask 077
 profile="$HOME/.local/share/melkor/${browser#melkor-}"
 mkdir -p "$profile"
+pulse="$XDG_RUNTIME_DIR/pulse/native"
+set -- "$program" "$@"
+if test -S "$pulse"; then
+    set -- --ro-bind "$pulse" /run/pulse/native --setenv PULSE_SERVER unix:/run/pulse/native -- "$@"
+else
+    set -- -- "$@"
+fi
 exec /usr/bin/bwrap --unshare-user --unshare-pid --unshare-ipc --unshare-uts --die-with-parent \
     --ro-bind "$runtime" / --dev /dev --proc /proc --tmpfs /tmp --perms 0700 --tmpfs /run --tmpfs /home \
     --tmpfs /dev/shm --bind "$profile" /home/browser --ro-bind "$socket" /run/wayland \
     --ro-bind /etc/resolv.conf /etc/resolv.conf \
     --clearenv --setenv HOME /home/browser --setenv PATH /usr/bin:/bin \
     --setenv XDG_RUNTIME_DIR /run --setenv WAYLAND_DISPLAY wayland \
-    --setenv MOZ_ENABLE_WAYLAND 1 --chdir /home/browser -- "$program" "$@"
+    --setenv MOZ_ENABLE_WAYLAND 1 --chdir /home/browser "$@"

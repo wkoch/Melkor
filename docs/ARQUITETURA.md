@@ -99,6 +99,8 @@ O PC entrega Nushell 0.117.0 pelo binário estático musl do upstream com hash f
 
 A camada de sessão compila Umbriel no commit `c634d946` e Noctalia 5.6.0 com o SDK Alpine fixado. O compositor usa seatd, Xwayland desativado e layout de teclado brasileiro. A montagem de `/dev/shm` no PC permite que o compositor publique o formato de buffers Wayland. Weston permanece disponível na imagem. [Empacotamento de Umbriel](https://github.com/noctalia-dev/umbriel/blob/main/PACKAGING.md) · [Noctalia 5.6.0](https://github.com/noctalia-dev/noctalia/releases/tag/v5.6.0)
 
+A camada Alpine também fixa PipeWire 1.6.8 e WirePlumber 0.5.15. Os processos de áudio acompanham a sessão do usuário comum e usam ALSA pelas permissões do grupo `audio`. Os navegadores acessam o socket Unix do servidor Pulse da sessão. O servidor bloqueia a criação de fluxos de captura e o carregamento de módulos pelo protocolo. O Firefox usa a biblioteca cliente Pulse da camada Alpine e os navegadores Chromium usam a da camada Debian. [Protocolo Pulse do PipeWire](https://docs.pipewire.org/page_module_protocol_pulse.html)
+
 LLVM/Clang é a escolha padrão para builds C/C++. A receita pode selecionar Zig para facilitar a compilação cruzada com musl ou por um ganho demonstrado. Ao comparar compiladores, manter versão do programa, alvo de CPU e otimizações equivalentes. Medir tempo de build separadamente de tempo de abertura, memória e duração de uma tarefa representativa.
 
 Preferir linkagem estática para ferramentas de console e resgate, quando os recursos usados forem preservados. Para o desktop, declarar as bibliotecas e módulos carregados em execução, inclusive drivers gráficos. Registrar as bibliotecas incorporadas ao binário para identificar quais aplicativos reconstruir após uma correção.

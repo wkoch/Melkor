@@ -6,19 +6,32 @@ from contextlib import suppress
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import socket
+import struct
 import subprocess
 import tempfile
 import time
 from types import SimpleNamespace
+import wave
 
 from m1_dns_vm import BOOT, guest
 
+WAYLAND = (
+    'for socket in /tmp/melkor-wayland.*/wayland-*; do test -S "$socket" && break; done; '
+    'export XDG_RUNTIME_DIR="${socket%/*}" WAYLAND_DISPLAY="${socket##*/}"; '
+)
+TONE = (
+    '<script>const c=new AudioContext();const o=c.createOscillator();'
+    'const g=c.createGain();g.gain.value=0.1;o.connect(g).connect(c.destination);'
+    'o.start();c.resume();</script>'
+)
 
-def desktop(console, qmp, run, apps, chromium, umbriel):
+
+def desktop(console, qmp, run, apps, chromium, umbriel, audio):
     BOOT["login"](console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
-    session = "--umbriel " if umbriel else ""
+    session = "" if umbriel else "--weston "
     for char in f"melkor\nmelkor\nmelkor-desktop {session}>/tmp/melkor-gui.log 2>&1\n":
         keys = {
             " ": ["spc"], "\n": ["ret"], "-": ["minus"], "/": ["slash"], ".": ["dot"],
@@ -57,38 +70,103 @@ def desktop(console, qmp, run, apps, chromium, umbriel):
         guest(console, f"for attempt in $(seq 1 12); do pidof {terminal} >/dev/null && exit 0; "
               "sleep 1; done; cat /tmp/melkor-gui.log; exit 1")
         qmp("screendump", filename=str(run / "02-terminal.ppm"))
+        if audio:
+            test_audio_policy(console)
         if apps:
-            test_firefox(console, qmp, run)
+            test_firefox(console, qmp, run, audio)
         if chromium:
-            test_chromium(console, qmp, run)
+            test_chromium(console, qmp, run, audio)
     finally:
         with suppress(RuntimeError):
             qmp("screendump", filename=str(run / "tela-final.ppm"))
 
 
-def test_firefox(console, qmp, run):
+def test_audio_policy(console):
+    guest(console, WAYLAND + 'for attempt in $(seq 1 15); do '
+          'melkor-session-exec pactl get-default-sink 2>/dev/null | grep -q "^alsa_output" && break; sleep 1; done; '
+          'melkor-session-exec pactl list short sinks | grep alsa_output || '
+          '{ cat "$XDG_RUNTIME_DIR"/pipewire*.log "$XDG_RUNTIME_DIR"/wireplumber.log; exit 1; }')
+    guest(console, WAYLAND + '''
+        melkor-session-exec parec --record > /tmp/pulse-capture.pcm 2>/tmp/pulse-capture.log &
+        recorder=$!; sleep 1; kill "$recorder" 2>/dev/null || :;
+        ! wait "$recorder" &&
+        test ! -s /tmp/pulse-capture.pcm &&
+        grep -qi "Access denied" /tmp/pulse-capture.log &&
+        ! melkor-session-exec pactl load-module module-null-sink > /tmp/pulse-module.log 2>&1 &&
+        grep -qi "Access denied" /tmp/pulse-module.log ||
+        { cat /tmp/pulse-module.log /tmp/pulse-capture.log; exit 1; }
+    '''.strip().replace("\n", " "))
+
+
+def require_audio_stream(console, process):
+    guest(console, WAYLAND + 'for attempt in $(seq 1 15); do '
+          'melkor-session-exec pactl list sink-inputs >/tmp/pulse-streams.log && '
+          f'grep -E "application.process.binary = \\"({process})\\"" /tmp/pulse-streams.log && exit 0; '
+          'sleep 1; done; cat /tmp/pulse-streams.log /tmp/melkor-*.log; exit 1')
+
+
+def browser_page(console, browser, title, audio):
+    content = f"<!doctype html><title>{title}</title><h1>{title}</h1>"
+    if audio:
+        content += TONE
+    if browser == "blanc":
+        # Blanc aceita apenas HTTP(S) no encaminhamento de URLs pela linha de comando.
+        headers = ("HTTP/1.1 200 OK\\r\\nContent-Type: text/html\\r\\n"
+                   f"Content-Length: {len(content)}\\r\\nConnection: close\\r\\n\\r\\n")
+        responder = ('#!/bin/sh', 'cr=$(printf "\\r")',
+                     'while IFS= read -r line && [ "$line" != "$cr" ]; do :; done',
+                     "cat /tmp/melkor-http-response")
+        guest(console, f'printf "%b%s" {shlex.quote(headers)} {shlex.quote(content)} >/tmp/melkor-http-response && '
+              f'printf "%s\\n" {" ".join(map(shlex.quote, responder))} >/tmp/melkor-http && '
+              'chmod 700 /tmp/melkor-http')
+        guest(console, 'rt=/opt/melkor-desktop; "$rt/lib/ld-musl-x86_64.so.1" '
+              '--library-path "$rt/lib:$rt/usr/lib" "$rt/bin/busybox" nc '
+              '-lk -s 127.0.0.1 -p 8765 -e /tmp/melkor-http >/tmp/melkor-http.log 2>&1 &')
+        url = "http://127.0.0.1:8765/"
+        guest(console, f'for attempt in 1 2 3 4 5; do wget -qO- {url} | grep -q {shlex.quote(title)} '
+              '&& exit 0; sleep 1; done; cat /tmp/melkor-http.log; exit 1')
+        return url
+    guest(console, f'dir="$HOME/.local/share/melkor/{browser}"; mkdir -p "$dir" && '
+          f'printf "%s\\n" {shlex.quote(content)} >"$dir/melkor-test.html"')
+    return "file:///home/browser/melkor-test.html"
+
+
+def test_firefox(console, qmp, run, audio):
     guest(console, """/usr/bin/nu --no-config-file -c '[1 2 3] | math sum' | grep -Fx 6""")
-    launch = (
-        'for socket in /tmp/melkor-wayland.*/wayland-*; do test -S "$socket" && break; done; '
-        'export XDG_RUNTIME_DIR="${socket%/*}" WAYLAND_DISPLAY="${socket##*/}"; '
-    )
-    page = "'data:text/html,<title>Melkor Firefox</title><h1>Melkor Firefox ESR</h1>'"
-    guest(console, launch + "melkor-firefox --headless --screenshot /home/browser/site.png " + page +
+    guest(console, 'for scheme in http https; do '
+          'LC_ALL=C gio mime "x-scheme-handler/$scheme" | head -n 1 | grep -E '
+          '"^Default application for .*: melkor-firefox[.]desktop$" || exit 1; done')
+    page = browser_page(console, "firefox", "Melkor Firefox ESR", audio)
+    guest(console, WAYLAND + "melkor-firefox --headless --screenshot /home/browser/site.png " + page +
           ' > /tmp/melkor-firefox.log 2>&1 && test -s "$HOME/.local/share/melkor/firefox/site.png" '
           '|| { cat /tmp/melkor-firefox.log; exit 1; }')
-    guest(console, launch + "melkor-firefox " + page + " >/tmp/melkor-firefox.log 2>&1 &")
+    if audio:
+        guest(console, 'profile="$HOME/.local/share/melkor/firefox/test-profile"; mkdir -p "$profile" && '
+              'printf \'user_pref("media.autoplay.default", 0);\\n\' >"$profile/user.js"')
+        page = "--profile /home/browser/test-profile " + page
+    guest(console, WAYLAND + "melkor-firefox " + page + " >/tmp/melkor-firefox.log 2>&1 &")
     guest(console, "for attempt in $(seq 1 15); do pidof firefox-esr >/dev/null && exit 0; "
           "sleep 1; done; cat /tmp/melkor-firefox.log; exit 1")
     time.sleep(2)
     qmp("screendump", filename=str(run / "03-firefox.ppm"))
+    if audio:
+        require_audio_stream(console, "firefox(-esr)?")
 
 
-def test_chromium(console, qmp, run):
+def test_chromium(console, qmp, run, audio):
     for name, process in (("brave-origin", "brave"), ("blanc", "blanc")):
-        launch = ('for socket in /tmp/melkor-wayland.*/wayland-*; do test -S "$socket" && break; done; '
-                  'export XDG_RUNTIME_DIR="${socket%/*}" WAYLAND_DISPLAY="${socket##*/}"; ')
-        page = f"'data:text/html,<title>Melkor {name}</title><h1>Melkor {name}</h1>'"
-        guest(console, launch + f"melkor-{name} " + page + f" >/tmp/melkor-{name}.log 2>&1 &")
+        page = browser_page(console, name, f"Melkor {name}", audio)
+        if audio:
+            page = "--no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required " + page
+            if name == "brave-origin":
+                guest(console, 'dir="$HOME/.local/share/melkor/brave-origin/test-profile"; mkdir -p "$dir" && '
+                      'printf \'%s\\n\' \'{"brave":{"origin":{"free_tier_accepted":true}}}\' >"$dir/Local State"')
+                page = "--user-data-dir=/home/browser/test-profile " + page
+            else:
+                guest(console, 'dir="$HOME/.local/share/melkor/blanc/.config/Blanc"; mkdir -p "$dir" && '
+                      'printf \'%s\\n\' \'{"onboardingVersion":1,"firstRunCompletedAt":1,'
+                      '"searchSuggestions":false,"usagePing":false}\' >"$dir/settings.json"')
+        guest(console, WAYLAND + f"melkor-{name} " + page + f" >/tmp/melkor-{name}.log 2>&1 &")
         guest(console, f"for attempt in $(seq 1 18); do "
               f'for pid in $(pidof {process}); do '
               'if grep -aq -- "--type=renderer" "/proc/$pid/cmdline" && '
@@ -96,9 +174,11 @@ def test_chromium(console, qmp, run):
               'then exit 0; fi; done; '
               f"sleep 1; done; cat /tmp/melkor-{name}.log; exit 1")
         qmp("screendump", filename=str(run / f"04-{name}.ppm"))
+        if audio:
+            require_audio_stream(console, process)
 
 
-def run_test(image, run, apps, chromium, umbriel):
+def run_test(image, run, apps, chromium, umbriel, audio):
     code, variables = BOOT["find_firmware"](SimpleNamespace(
         ovmf_code=Path(code) if (code := os.environ.get("OVMF_CODE")) else None,
         ovmf_vars=Path(variables) if (variables := os.environ.get("OVMF_VARS")) else None))
@@ -123,6 +203,9 @@ def run_test(image, run, apps, chromium, umbriel):
                    "-drive", drive(disk, "if=none,id=melkor"),
                    "-device", "nvme,drive=melkor,serial=melkor-desktop,bootindex=1",
                    "-vga", "std", "-device", "virtio-tablet-pci"]
+        if audio:
+            command += ["-audiodev", f"wav,id=audio,path={run / 'audio.wav'}",
+                        "-device", "ich9-intel-hda", "-device", "hda-duplex,audiodev=audio"]
         with (run / "serial.log").open("wb") as log, subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as vm:
@@ -150,10 +233,30 @@ def run_test(image, run, apps, chromium, umbriel):
                         time.sleep(5)
                         qmp("screendump", filename=str(run / "00-boot.ppm"))
                         with BOOT["serial_console"](vm, log, 120) as console:
-                            desktop(console, qmp, run, apps, chromium, umbriel)
+                            desktop(console, qmp, run, apps, chromium, umbriel, audio)
+                        qmp("quit")
+                        vm.wait(timeout=10)
             finally:
-                vm.kill()
+                if vm.poll() is None:
+                    vm.kill()
                 log.write(vm.stdout.read())
+    if audio:
+        check_audio_recording(run / "audio.wav")
+
+
+def check_audio_recording(path):
+    with path.open("r+b") as stream:
+        header = stream.read(44)
+        # O driver WAV do QEMU pode deixar os campos de tamanho provisórios.
+        if header.startswith(b"RIFF\0\0\0\0WAVEfmt \x10\0\0\0") and header[36:] == b"data\0\0\0\0":
+            size = stream.seek(0, os.SEEK_END)
+            stream.seek(4)
+            stream.write(struct.pack("<I", size - 8))
+            stream.seek(40)
+            stream.write(struct.pack("<I", size - 44))
+    with wave.open(str(path), "rb") as recording:
+        if not any(recording.readframes(recording.getnframes())):
+            raise RuntimeError("A placa HDA virtual não entregou amostras de áudio.")
 
 
 def main():
@@ -163,16 +266,21 @@ def main():
     parser.add_argument("--apps", action="store_true")
     parser.add_argument("--chromium", action="store_true")
     parser.add_argument("--umbriel", action="store_true")
+    parser.add_argument("--audio", action="store_true")
     args = parser.parse_args()
+    if args.audio and not args.apps:
+        parser.error("--audio requer --apps.")
     args.log_dir.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="desktop-", dir=args.log_dir)).resolve()
     print(f"Evidências em {run}", flush=True)
-    run_test(args.image, run, args.apps, args.chromium, args.umbriel)
+    run_test(args.image, run, args.apps, args.chromium, args.umbriel, args.audio)
     tested = "Alacritty com Nushell e Firefox ESR" if args.apps else "foot"
     if args.chromium:
         tested += ", Brave Origin e Blanc"
     session = "Umbriel com Noctalia" if args.umbriel else "Weston"
     print(f"Login local, {session} como usuário comum e abertura de {tested} verificados.")
+    if args.audio:
+        print("Reprodução por HDA virtual e rejeição de captura e de módulos Pulse verificadas.")
 
 
 if __name__ == "__main__":

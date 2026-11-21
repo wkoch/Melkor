@@ -3,11 +3,24 @@ set -eu
 
 runtime=/opt/melkor-desktop
 case "${1:-}" in
-    umbriel|noctalia) program="$runtime/usr/bin/$1" ;;
+    umbriel|noctalia|pipewire|pipewire-pulse|wireplumber|wpctl|pactl|paplay|parec)
+        program="$runtime/usr/bin/$1"
+        ;;
     *) exit 2 ;;
 esac
 shift
 export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
 export GBM_BACKENDS_PATH="$runtime/usr/lib/gbm"
 export WLR_RENDERER_ALLOW_SOFTWARE=1
-exec "$runtime/lib/ld-musl-x86_64.so.1" --library-path "$runtime/lib:$runtime/usr/lib" "$program" "$@"
+export PIPEWIRE_MODULE_DIR="$runtime/usr/lib/pipewire-0.3"
+export PIPEWIRE_CONFIG_DIR="$runtime/usr/share/pipewire"
+export SPA_PLUGIN_DIR="$runtime/usr/lib/spa-0.2"
+export SPA_DATA_DIR="$runtime/usr/share/spa-0.2"
+export ALSA_CONFIG_DIR="$runtime/usr/share/alsa"
+export ACP_PATHS_DIR="$runtime/usr/share/alsa-card-profile/mixer/paths"
+export ACP_PROFILES_DIR="$runtime/usr/share/alsa-card-profile/mixer/profile-sets"
+export WIREPLUMBER_CONFIG_DIR="$runtime/usr/share/wireplumber"
+export WIREPLUMBER_DATA_DIR="$runtime/usr/share/wireplumber"
+export WIREPLUMBER_MODULE_DIR="$runtime/usr/lib/wireplumber-0.5"
+exec "$runtime/lib/ld-musl-x86_64.so.1" \
+    --library-path "$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/pulseaudio" "$program" "$@"

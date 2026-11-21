@@ -4,3 +4,4 @@ Name=Blanc
 Exec=/usr/bin/melkor-blanc %U
 Icon=/usr/share/melkor/blanc.png
 Categories=Network;WebBrowser;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;

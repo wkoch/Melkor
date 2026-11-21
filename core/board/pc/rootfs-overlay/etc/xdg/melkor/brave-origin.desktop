@@ -4,3 +4,4 @@ Name=Brave Origin
 Exec=/usr/bin/melkor-brave-origin %U
 Icon=/usr/share/melkor/brave-origin.png
 Categories=Network;WebBrowser;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;

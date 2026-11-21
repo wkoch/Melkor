@@ -20,6 +20,7 @@ d91fef83a186d3fc9fff293bfd7da4f684f736d15459d258a5a0d251168c1a35 https://deb.deb
 4158976c77038b93021967f425b4cc505df18c4f5e3f444732399e7ed4af4419 https://deb.debian.org/debian/pool/main/a/apparmor/libapparmor1_4.1.0-1_amd64.deb libapparmor1_4.1.0-1_amd64.deb
 04688afdff3769c0f685541daed7b2f6f0cb946799ddf1d5847ddf11fe245559 https://deb.debian.org/debian/pool/main/a/alsa-lib/libasound2-data_1.2.14-1%2bdeb13u1_all.deb libasound2-data_1.2.14-1+deb13u1_all.deb
 5495496142d57e5ad6d581ac5456ec3c87f872c109a2bfb815d154b673eebc67 https://deb.debian.org/debian/pool/main/a/alsa-lib/libasound2t64_1.2.14-1%2bdeb13u1_amd64.deb libasound2t64_1.2.14-1+deb13u1_amd64.deb
+e7958777b0e3586349c57ac759a95b68f80d28e5bd1c4225705198b39b436115 https://deb.debian.org/debian/pool/main/liba/libasyncns/libasyncns0_0.8-6%2bb5_amd64.deb libasyncns0_0.8-6+b5_amd64.deb
 c0fe87ea1bdca2f938eaa8286af5ad38ecd15cf18c6cfb5961d7d46ac3192325 https://deb.debian.org/debian/pool/main/a/at-spi2-core/libatk-bridge2.0-0t64_2.56.2-1%2bdeb13u2_amd64.deb libatk-bridge2.0-0t64_2.56.2-1+deb13u2_amd64.deb
 24786bc90e3ff80c4d1d8bdb5ec18bb5f06df9081a5233eb080f3202fcf6a1c3 https://deb.debian.org/debian/pool/main/a/at-spi2-core/libatk1.0-0t64_2.56.2-1%2bdeb13u2_amd64.deb libatk1.0-0t64_2.56.2-1+deb13u2_amd64.deb
 212b399aae2f7299203d261a57e49372e09565a9a5ea971905f94a3960366c05 https://deb.debian.org/debian/pool/main/g/gcc-14/libatomic1_14.2.0-19_amd64.deb libatomic1_14.2.0-19_amd64.deb
@@ -48,6 +49,7 @@ b002ea172b9c1e34a67bc497c523c67bb74c3f0a4e98113cb083990a1f1d3bfe https://deb.deb
 4c4c8024f2175086de65bca9fdc3fbb967f2863ebf249d489c66d0c8103dd3a3 https://deb.debian.org/debian/pool/main/libe/libepoxy/libepoxy0_1.5.10-2_amd64.deb libepoxy0_1.5.10-2_amd64.deb
 feff874772cae904ae4d24e917b35664952bec4b4ae9100a4edda5a7fa746832 https://deb.debian.org/debian/pool/main/e/expat/libexpat1_2.9.0-1%7edeb13u1_amd64.deb libexpat1_2.9.0-1~deb13u1_amd64.deb
 0ebdc340de33333639c3c63874cd4b15ac2e83dfa1ef3053b7eefaf4919f4f68 https://deb.debian.org/debian/pool/main/libf/libffi/libffi8_3.4.8-2_amd64.deb libffi8_3.4.8-2_amd64.deb
+658b9f77d35638caf75dfaea4f6d5cde196104d5662f0776e23d7cc450bd4cb5 https://deb.debian.org/debian/pool/main/f/flac/libflac14_1.5.0%2bds-2_amd64.deb libflac14_1.5.0+ds-2_amd64.deb
 7ae91ec59857cc8e375eb2bdd371a4a69daea38f7787d06d474a847867d852b1 https://deb.debian.org/debian/pool/main/f/fontconfig/libfontconfig1_2.15.0-2.3_amd64.deb libfontconfig1_2.15.0-2.3_amd64.deb
 b57a449c874f2cc126a48149daa27b8d1a8935fbf1609ccfe28ca1610d00ee29 https://deb.debian.org/debian/pool/main/f/freetype/libfreetype6_2.13.3%2bdfsg-1%2bdeb13u2_amd64.deb libfreetype6_2.13.3+dfsg-1+deb13u2_amd64.deb
 f8c35ec8606d0843bd3cf020c6cfa39ddfe717ec58ed826b5855ba9927eb0d55 https://deb.debian.org/debian/pool/main/f/fribidi/libfribidi0_1.0.16-1_amd64.deb libfribidi0_1.0.16-1_amd64.deb
@@ -72,6 +74,8 @@ e2baf92c57d1db1753e5781a61450d9a01e7833c7bd2dfe87776a6811c11ecc2 https://deb.deb
 60069e4a550ca890113fa89d3001417781b18e146ec5d637d31e368dec9909bd https://deb.debian.org/debian/pool/main/o/openldap/libldap2_2.6.10%2bdfsg-1_amd64.deb libldap2_2.6.10+dfsg-1_amd64.deb
 2e0c13c0ddbde12968c2c713c2e0474a5b78e90d5216031256a725e8c76aa31c https://deb.debian.org/debian/pool/main/l/lerc/liblerc4_4.0.0%2bds-5_amd64.deb liblerc4_4.0.0+ds-5_amd64.deb
 db0d614d61345ca710fb73e75105f1ec6e38898fa7b3aa99fa7eb7d8b0a11d57 https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libllvm19_19.1.7-3%2bb1_amd64.deb libllvm19_1%3a19.1.7-3+b1_amd64.deb
+3867319c9fbbc8cc25f2d1dc1d75d13548c84c37fa709c1ac9ca02ac051b63ab https://deb.debian.org/debian/pool/main/l/lame/libmp3lame0_3.100-6%2bb3_amd64.deb libmp3lame0_3.100-6+b3_amd64.deb
+31fa6ef638f1fdbe198faee0b6fe50d9dd468077f8247cc3dbf6b2250abb6101 https://deb.debian.org/debian/pool/main/m/mpg123/libmpg123-0t64_1.32.10-1%2bdeb13u1_amd64.deb libmpg123-0t64_1.32.10-1+deb13u1_amd64.deb
 47baa2e11579583654583a066b69bd5a5d2f22423081f707ed6c0c3ba6d538b7 https://deb.debian.org/debian/pool/main/n/ncurses/libncursesw6_6.5%2b20250216-2_amd64.deb libncursesw6_6.5+20250216-2_amd64.deb
 a5c10b427f9dc625754a9f323b07f2a76932a10161888e6e040c8f9448c13f05 https://deb.debian.org/debian/pool/main/n/nghttp2/libnghttp2-14_1.64.0-1.1%2bdeb13u2_amd64.deb libnghttp2-14_1.64.0-1.1+deb13u2_amd64.deb
 388e4c33b72829cbf0d098afdc8539fa5ba7458eddb077f5538fdb4d5538716b https://deb.debian.org/debian/pool/main/n/nghttp3/libnghttp3-9_1.8.0-1_amd64.deb libnghttp3-9_1.8.0-1_amd64.deb
@@ -79,6 +83,8 @@ a5c10b427f9dc625754a9f323b07f2a76932a10161888e6e040c8f9448c13f05 https://deb.deb
 2a7f109c0c4db6a800e4661c5e5e34e1f1f83c8162482276183d1ada9da7c96c https://deb.debian.org/debian/pool/main/n/ngtcp2/libngtcp2-crypto-gnutls8_1.11.0-1%2bdeb13u1_amd64.deb libngtcp2-crypto-gnutls8_1.11.0-1+deb13u1_amd64.deb
 87fc2039ee89cff2b8010fa9535706b1def40031acfc52bf12197dcb3cb7b064 https://deb.debian.org/debian/pool/main/n/nspr/libnspr4_4.36-1_amd64.deb libnspr4_2%3a4.36-1_amd64.deb
 7059839165c39e734ff59c712fde83ef5ea01328872819dfbabd1c08e75f3116 https://deb.debian.org/debian/pool/main/n/nss/libnss3_3.110-1%2bdeb13u5_amd64.deb libnss3_2%3a3.110-1+deb13u5_amd64.deb
+911aec914f5bda0788164ff8068b682537378bf8d407b1d6c1b377522f96b83b https://deb.debian.org/debian/pool/main/libo/libogg/libogg0_1.3.5-3%2bb2_amd64.deb libogg0_1.3.5-3+b2_amd64.deb
+794056db33d71b2ac4bd8b5a4eb23b627bcb8a49d123c33b6e841a996253a067 https://deb.debian.org/debian/pool/main/o/opus/libopus0_1.5.2-2_amd64.deb libopus0_1.5.2-2_amd64.deb
 784bf2063e166c8bc851a32623b74ebd85c499043a9d57c5bbd64fa63447f45a https://deb.debian.org/debian/pool/main/p/p11-kit/libp11-kit0_0.25.5-3_amd64.deb libp11-kit0_0.25.5-3_amd64.deb
 fcf4ee7d09e14ac9e52d8a9adb8f609ba06cc6a3ecbccc205e2c9a1ba1c39d16 https://deb.debian.org/debian/pool/main/s/systemd/libpam-systemd_257.13-1%7edeb13u1_amd64.deb libpam-systemd_257.13-1~deb13u1_amd64.deb
 4fa38472696d2ddb10bfc9a4692a9446e8478fdb1f48c769a609fc9fec3adfc5 https://deb.debian.org/debian/pool/main/p/pango1.0/libpango-1.0-0_1.56.3-1_amd64.deb libpango-1.0-0_1.56.3-1_amd64.deb
@@ -89,12 +95,14 @@ d9a0091071635a84e837051e4813005ac445071731becea28fba4d9806df5252 https://deb.deb
 0f8034d1c2547760430c81e8d87e5d6acd533a3493c80cf76dbecd0343b6773c https://deb.debian.org/debian/pool/main/libp/libpng1.6/libpng16-16t64_1.6.48-1%2bdeb13u6_amd64.deb libpng16-16t64_1.6.48-1+deb13u6_amd64.deb
 c9d61caab1b2ddfc3f17edb95be31b9809fcb2daf27d853dff615bc4ebd08b4b https://deb.debian.org/debian/pool/main/p/procps/libproc2-0_4.0.4-9_amd64.deb libproc2-0_2%3a4.0.4-9_amd64.deb
 59d42bb1f9ebc0d1776fe616efb08a7a8568b05982e00f70b03c63863db768ab https://deb.debian.org/debian/pool/main/libp/libpsl/libpsl5t64_0.21.2-1.1%2bb1_amd64.deb libpsl5t64_0.21.2-1.1+b1_amd64.deb
+786aca79119cb249562708fd24dcdf817604cfe75bbfcb8cda3464042e17f40e https://deb.debian.org/debian/pool/main/p/pulseaudio/libpulse0_17.0%2bdfsg1-2%2bb1_amd64.deb libpulse0_17.0+dfsg1-2+b1_amd64.deb
 93baa2004cbe6c8721b9e81beed078612540aef120970b4751305c51c6697368 https://deb.debian.org/debian/pool/main/r/rtmpdump/librtmp1_2.4%2b20151223.gitfa8646d.1-2%2bb5_amd64.deb librtmp1_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb
 66e49d7ae026811b49a0050f18b0325960a2625ffd1ff60d91b7844a815fa9d2 https://deb.debian.org/debian/pool/main/c/cyrus-sasl2/libsasl2-2_2.1.28%2bdfsg1-9_amd64.deb libsasl2-2_2.1.28+dfsg1-9_amd64.deb
 a5c38659fbd62c33c6d9bfa2be43e75a572d1818531aad32dd74d0a58cc4bd19 https://deb.debian.org/debian/pool/main/c/cyrus-sasl2/libsasl2-modules-db_2.1.28%2bdfsg1-9_amd64.deb libsasl2-modules-db_2.1.28+dfsg1-9_amd64.deb
 3056da80c7d963af795dab480ab6f6f4b154ad4ac39f522dc52d17c834fea253 https://deb.debian.org/debian/pool/main/l/lm-sensors/libsensors-config_3.6.2-2_all.deb libsensors-config_1%3a3.6.2-2_all.deb
 f0a994a6d7cfa695dea5343d0d1ba7eed796c0ad920c7282998b95f60049c4f6 https://deb.debian.org/debian/pool/main/l/lm-sensors/libsensors5_3.6.2-2_amd64.deb libsensors5_1%3a3.6.2-2_amd64.deb
 51934833d909588f7761fd84362114e90d8d2d38af57edf5df5c4a705e037547 https://deb.debian.org/debian/pool/main/libw/libwebp/libsharpyuv0_1.5.0-0.1_amd64.deb libsharpyuv0_1.5.0-0.1_amd64.deb
+d92263a045554e6f39c6b1c2ee4cca44a3248d9b9339301ff195969bf84b75eb https://deb.debian.org/debian/pool/main/libs/libsndfile/libsndfile1_1.2.2-2%2bdeb13u1_amd64.deb libsndfile1_1.2.2-2+deb13u1_amd64.deb
 dbb1024c192d4d292b7cfa902b96076cfe81b56a5eed4fb28da36e8bf543e49a https://deb.debian.org/debian/pool/main/libs/libssh2/libssh2-1t64_1.11.1-1%2bdeb13u2_amd64.deb libssh2-1t64_1.11.1-1+deb13u2_amd64.deb
 ffefb9af363e0e4592251b2533eb06453c8e470f7772e40263c4b2129251a6d5 https://deb.debian.org/debian/pool/main/o/openssl/libssl3t64_3.5.9-1%7edeb13u1_amd64.deb libssl3t64_3.5.9-1~deb13u1_amd64.deb
 2d349824e57f88507e2a33360610d8afc143a4ad5e80ee4bf8f37b826d6f37f9 https://deb.debian.org/debian/pool/main/s/systemd/libsystemd-shared_257.13-1%7edeb13u1_amd64.deb libsystemd-shared_257.13-1~deb13u1_amd64.deb
@@ -103,6 +111,8 @@ fd38d40602834d510a29140bd27fd48485105e834f03dccab1c02e2edaa794dd https://deb.deb
 e6364c07aeeffe9a95f267061d9df168e48e9dc9126c3b40e19dc829f67702a7 https://deb.debian.org/debian/pool/main/libt/libthai/libthai0_0.1.29-2%2bb1_amd64.deb libthai0_0.1.29-2+b1_amd64.deb
 6bb2038f36817ae1ee6d33df03917b21835dcc2e0f3e3e80a71390e83c171173 https://deb.debian.org/debian/pool/main/t/tiff/libtiff6_4.7.0-3%2bdeb13u3_amd64.deb libtiff6_4.7.0-3+deb13u3_amd64.deb
 6dd3490bef06ea1096f32d10766b7e016cf579bfae8451d1b7df15ce05b8aa46 https://deb.debian.org/debian/pool/main/libu/libunistring/libunistring5_1.3-2_amd64.deb libunistring5_1.3-2_amd64.deb
+0465f7f602f7b00965e58e7273b5876060ab7946f0452a9f95d979046932cc42 https://deb.debian.org/debian/pool/main/libv/libvorbis/libvorbis0a_1.3.7-3_amd64.deb libvorbis0a_1.3.7-3_amd64.deb
+5fbbf06a5b196235aa2753cd12bbe7f843328571d368f15b1c337578e29f73a2 https://deb.debian.org/debian/pool/main/libv/libvorbis/libvorbisenc2_1.3.7-3_amd64.deb libvorbisenc2_1.3.7-3_amd64.deb
 f47da79cd140264fe21cceb08bc87a71bc7fec05819e4a421f3f518d21101a37 https://deb.debian.org/debian/pool/main/v/vulkan-loader/libvulkan1_1.4.309.0-1_amd64.deb libvulkan1_1.4.309.0-1_amd64.deb
 d1607e1db1a7c5378a2e5c6ae7b20f64dc6acf134f953d84a7f5204b74339f33 https://deb.debian.org/debian/pool/main/w/wayland/libwayland-client0_1.23.1-3_amd64.deb libwayland-client0_1.23.1-3_amd64.deb
 26fccae2b1228744de0cad6c688550b8d13cd4e8d4ccf0cfdae015634ece673f https://deb.debian.org/debian/pool/main/w/wayland/libwayland-cursor0_1.23.1-3_amd64.deb libwayland-cursor0_1.23.1-3_amd64.deb

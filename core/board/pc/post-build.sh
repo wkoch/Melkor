@@ -30,6 +30,9 @@ if [ -n "${MELKOR_PC_DESKTOP_LAYER:-}" ]; then
         "$1/opt/melkor-desktop/usr/lib/firefox-esr/distribution/policies.json"
     cat "$1/etc/xdg/weston/melkor-firefox.ini" >> "$1/etc/xdg/weston/weston.ini"
     install -D -m 0644 "$1/etc/xdg/melkor/firefox.desktop" "$1/usr/share/applications/melkor-firefox.desktop"
+    install -D -m 0644 "$1/etc/xdg/melkor/mimeapps.list" "$1/usr/share/applications/mimeapps.list"
+    install -D -m 0644 "$1/etc/xdg/melkor/audio-pulse.conf" \
+        "$1/opt/melkor-desktop/usr/share/pipewire/pipewire-pulse.conf.d/90-melkor.conf"
 fi
 if [ -n "${MELKOR_PC_CHROMIUM_LAYER:-}" ]; then
     install -d "$1/opt/melkor-chromium"

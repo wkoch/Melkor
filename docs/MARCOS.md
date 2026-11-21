@@ -221,4 +221,14 @@ O core de laboratório em `out/pc-apps-release` inclui Nushell, Alacritty, Firef
 
 O executor `tests/pc_desktop_vm.py --apps --chromium --umbriel` iniciou a sessão gráfica com a conta comum. Noctalia abriu o painel e o atalho `Super+Enter` iniciou o Nushell no Alacritty. O Firefox renderizou uma página local e abriu por Wayland. Brave Origin e Blanc criaram processos de renderização com seccomp ativo. O registro e as capturas estão em `out/pc-apps-release/desktop-tests/desktop-9u5v96ak/`. A ISO de 945 MiB passou pelo CD UEFI e pelo modo normal do Ventoy, com 8 GiB na VM. O cancelamento preservou o disco de destino e a instalação válida iniciou os dois slots com o NVMe vizinho intacto. Relatórios em `out/pc-apps-iso/tests/install-cagrlxdw/` e `out/pc-apps-iso/ventoy/install-jqfzqjq_/`.
 
-`make test` passou com 48 testes Python e cobertura de 80,1% em Go, 92,0% em Python e 97,2% em Shell. A prévia comprova o início dos aplicativos e do desktop. Áudio, portais de arquivos, desbloqueio por Noctalia e o teste físico no HP permanecem pendentes. [Comandos](TESTES.md#perfil-de-aplicativos-do-pc)
+`make test` passou com 48 testes Python e cobertura de 80,1% em Go, 92,0% em Python e 97,2% em Shell. [Comandos](TESTES.md#perfil-de-aplicativos-do-pc)
+
+### Desktop padrão e reprodução de áudio
+
+`make pc-desktop-layer pc-chromium-layer` montou as camadas com Podman rootless, APKs e DEBs verificados pelos hashes fixados. O Buildroot executou `linux-reconfigure` no contêiner Fedora 45 e gerou o core com as três camadas, reutilizando a toolchain do PC e a camada já compilada de Umbriel e Noctalia. `make pc-disk OUT=out/pc-desktop-next/core` gravou somente o disco virtual de laboratório.
+
+`make test-pc-desktop OUT=out/pc-desktop-next/core PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_UMBRIEL=1 PC_DESKTOP_AUDIO=1` confirmou Umbriel e Noctalia pelo comando `melkor-desktop`, Alacritty com Nushell e Firefox como padrão HTTP e HTTPS. Firefox ESR, Brave Origin e Blanc abriram fluxos de reprodução. O QEMU gravou amostras da saída HDA virtual, e o Pulse rejeitou captura e carregamento de módulos. A sessão Weston também iniciou com `--weston`. Logs e gravação em `out/pc-desktop-next/core/desktop-tests/desktop-6ywl500p/`.
+
+`make installer-iso OUT=out/pc-desktop-next/ventoy-ready PC_OUT=out/pc-desktop-next/core` gerou a ISO de 951 MiB com SHA-256 `91ff6077fac4f03280ff78f9222f09c191d642365c14b721c724e14e7d921fcb`. O teste `make test-installer TEST_VM_MEMORY=8192` e a variante `tests/installer_vm.py --ventoy-drive` usaram a mesma ISO, com QEMU, OVMF, TCG e setores lógicos de 512 bytes. A mídia inicializou por CD UEFI e pelo modo normal do Ventoy. Nos dois casos a instalação confirmou A e B, e os hashes do NVMe vizinho conferiram. Relatórios em `out/pc-desktop-next/ventoy-ready/tests/`.
+
+`make test` passou com 49 testes Python e cobertura de 80,1% em Go, 92,0% em Python e 97,0% em Shell. O teste de áudio no HP, os portais de arquivos, o desbloqueio no Noctalia e a biometria continuam pendentes.

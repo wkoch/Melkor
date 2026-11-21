@@ -103,10 +103,11 @@ make image BOARD=pc OUT=out/pc-apps \
   MELKOR_PC_CHROMIUM_LAYER="$PWD/out/pc-chromium.layer.tar.gz" \
   MELKOR_PC_SESSION_LAYER="$PWD/out/pc-session.layer.tar.gz"
 make pc-disk OUT=out/pc-apps
-make test-pc-desktop OUT=out/pc-apps PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_UMBRIEL=1
+make test-pc-desktop OUT=out/pc-apps PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 \
+  PC_DESKTOP_UMBRIEL=1 PC_DESKTOP_AUDIO=1
 ```
 
-O executor inicia o compositor, verifica que Noctalia foi aberta pela sessão, aciona o terminal e executa a expressão `[1 2 3] | math sum` com Nushell. O Firefox renderiza uma página local e abre a interface. Nos navegadores Chromium a prova exige um processo de renderização com filtro seccomp. Os logs seriais e as capturas ficam em `OUT/desktop-tests/`. O plano de instalação com todos os aplicativos usa `make test-installer TEST_VM_MEMORY=8192`, porque os dois slots e a imagem temporária ocupam RAM durante a gravação.
+O executor inicia o compositor, verifica que Noctalia foi aberta pela sessão, aciona o terminal e executa a expressão `[1 2 3] | math sum` com Nushell. O GIO confirma as associações HTTP e HTTPS e o Firefox renderiza uma página local. Nos navegadores Chromium a prova exige um processo de renderização com filtro seccomp. Com `PC_DESKTOP_AUDIO=1`, o QEMU fornece uma placa HDA e grava a saída em WAV. O teste verifica que o Pulse rejeita a criação de um fluxo de captura e o carregamento de módulos, que cada navegador cria um fluxo de reprodução e que o WAV contém amostras de áudio. Os perfis descartáveis pulam as telas de boas-vindas dos navegadores para tocar o tom. O Blanc recebe a página por HTTP no loopback da VM, pois seu encaminhamento de URLs aceita HTTP e HTTPS. Os logs seriais e as capturas ficam em `OUT/desktop-tests/`. O plano de instalação com todos os aplicativos usa `make test-installer TEST_VM_MEMORY=8192`, porque os dois slots e a imagem temporária ocupam RAM durante a gravação.
 
 ## Download HTTPS de atualizações do PC
 

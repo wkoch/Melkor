@@ -45,7 +45,7 @@ source "$script" "$@"
 """)
         cls.app = cls.wrapper("app", """test() {
     case "$1" in
-        -x|-S) [[ ${TEST_APP:-} = yes ]] ;;
+        -x|-S) [[ ${TEST_APP:-} = yes && "$*" != "-S /run/session/pulse/native" ]] || [[ ${TEST_PULSE:-} = yes ]] ;;
         *) builtin test "$@" ;;
     esac
 }
@@ -94,8 +94,26 @@ blkid() {
     esac
 }
 test() {
-    if [[ $1 = -b ]]; then [[ $2 =~ ^/dev/vda[1-3]$ ]]; else builtin test "$@"; fi
+    case "$1" in
+        -b) [[ $2 =~ ^/dev/vda[1-3]$ ]] ;;
+        -x) if [[ $2 = /opt/melkor-desktop/usr/bin/umbriel ]]; then [[ ${TEST_UMBRIEL:-} ]]; else builtin test "$@"; fi ;;
+        *) builtin test "$@" ;;
+    esac
 }
+script=$1
+shift
+source "$script" "$@"
+""")
+        cls.session = cls.wrapper("session", """test() {
+    case "$1" in
+        -x|-S) [[ ${TEST_AUDIO:-} = yes ]] ;;
+        *) builtin test "$@" ;;
+    esac
+}
+function /usr/bin/melkor-session-exec() { printf '%s\n' "$1"; }
+kill() { printf 'kill\n' >> "$TEST_BOOT_LOG"; }
+exec() { "$@"; exit $?; }
+desktop() { printf 'desktop\n' >> "$TEST_BOOT_LOG"; }
 script=$1
 shift
 source "$script" "$@"
@@ -285,6 +303,8 @@ source "$script" "$@"
         (weston / "melkor-firefox.ini").write_text("[launcher]\n")
         (target / "etc/xdg/melkor").mkdir()
         (target / "etc/xdg/melkor/firefox-policies.json").write_text("{}")
+        for config in ("mimeapps.list", "audio-pulse.conf"):
+            shutil.copy2(script.parent / "rootfs-overlay/etc/xdg/melkor" / config, target / "etc/xdg/melkor")
         for browser in ("firefox", "brave-origin", "blanc"):
             (target / f"etc/xdg/melkor/{browser}.desktop").write_text("[Desktop Entry]\n")
         (weston / "melkor-chromium.ini").write_text("[launcher]\n")
@@ -299,6 +319,8 @@ source "$script" "$@"
         self.assertEqual((weston / "weston.ini").read_text(), "[core]\n[launcher]\n[launcher]\n")
         self.assertEqual((target / "usr/share/melkor/firefox.png").read_text(), "ícone")
         self.assertEqual((target / "usr/share/melkor/blanc.png").read_text(), "ícone")
+        self.assertIn("x-scheme-handler/https=melkor-firefox.desktop;",
+                      (target / "usr/share/applications/mimeapps.list").read_text())
 
     def test_lancadores_pc_preservam_shell_e_isolam_o_navegador(self):
         binaries = self.project / "core/board/pc/rootfs-overlay/usr/bin"
@@ -308,11 +330,15 @@ source "$script" "$@"
         self.assertIn("alacritty --config-file /etc/xdg/alacritty/melkor.toml -e /usr/bin/nu", self.boot_log.read_text())
         self.run_script(self.app, binaries / "melkor-firefox", code=1)
         self.run_script(self.app, binaries / "melkor-firefox", TEST_APP="yes", HOME=self.out,
+                        TEST_PULSE="yes",
                         XDG_RUNTIME_DIR="/run/session", WAYLAND_DISPLAY="wayland-1")
         args = self.boot_log.read_text()
         self.assertIn("--unshare-user --unshare-pid --unshare-ipc --unshare-uts", args)
         self.assertIn("--ro-bind /run/session/wayland-1 /run/wayland", args)
         self.assertIn("--ro-bind /etc/resolv.conf /etc/resolv.conf", args)
+        self.assertIn("--ro-bind /run/session/pulse/native /run/pulse/native", args)
+        self.assertIn("--setenv PULSE_SERVER unix:/run/pulse/native", args)
+        self.assertNotIn("/dev/snd", args)
         self.assertNotIn("--no-sandbox", args)
         self.run_script(self.app, binaries / "melkor-browser", code=2)
         self.run_script(self.app, binaries / "melkor-session-exec", code=2)
@@ -326,6 +352,17 @@ source "$script" "$@"
             self.assertIn(f"/share/melkor/{name}", args)
             self.assertIn(f"{program} --ozone-platform=wayland", args)
             self.assertNotIn("--no-sandbox", args)
+            self.assertNotIn("PULSE_SERVER", args)
+
+    def test_pc_audio_acompanha_o_ciclo_da_sessao(self):
+        file = self.project / "core/board/pc/rootfs-overlay/usr/libexec/melkor-desktop-session"
+        self.run_script(self.session, file, "desktop", XDG_RUNTIME_DIR=self.out)
+        self.assertEqual(self.boot_log.read_text(), "desktop\n")
+        self.boot_log.write_text("")
+        self.run_script(self.session, file, "desktop", TEST_AUDIO="yes", XDG_RUNTIME_DIR=self.out)
+        self.assertEqual(self.boot_log.read_text(), "desktop\nkill\nkill\nkill\n")
+        for service in ("pipewire", "wireplumber", "pipewire-pulse"):
+            self.assertEqual((self.out / f"{service}.log").read_text(), f"{service}\n")
 
     def test_init_live_exige_devs_em_memoria_antes_de_iniciar_dinit(self):
         init = self.project / "core/board/live/rootfs-overlay/init"
@@ -390,12 +427,15 @@ source "$script" "$@"
         file = self.project / "core/board/pc/rootfs-overlay/usr/bin/melkor-desktop"
         self.run_script(self.boot, file)
         self.assertEqual(self.boot_log.read_text().splitlines(), [
-            "dbus-run-session /tmp/melkor-simulado seatd -- weston --renderer=pixman",
+            "dbus-run-session /tmp/melkor-simulado seatd -- /usr/libexec/melkor-desktop-session weston --renderer=pixman",
             "rm -rf -- /tmp/melkor-simulado",
         ])
         self.boot_log.write_text("")
-        self.run_script(self.boot, file, "--umbriel")
+        self.run_script(self.boot, file, TEST_UMBRIEL="1")
         self.assertIn("melkor-session-exec umbriel -c /etc/xdg/melkor/umbriel.toml", self.boot_log.read_text())
+        self.boot_log.write_text("")
+        self.run_script(self.boot, file, "--weston", TEST_UMBRIEL="1")
+        self.assertIn("weston --renderer=pixman", self.boot_log.read_text())
         self.run_script(self.boot, file, "--invalido", code=2)
 
     def test_rauc_monta_so_dispositivos_inequivocos(self):

@@ -116,7 +116,9 @@ test-pc-disk: test-boot
 
 test-pc-desktop: BOARD = pc
 test-pc-desktop:
-	$(BUILD_ENV) python3 tests/pc_desktop_vm.py "$(OUT)/melkor-pc.img" --log-dir "$(OUT)/desktop-tests" $(if $(filter 1,$(PC_DESKTOP_APPS)),--apps) $(if $(filter 1,$(PC_DESKTOP_CHROMIUM)),--chromium) $(if $(filter 1,$(PC_DESKTOP_UMBRIEL)),--umbriel)
+	$(BUILD_ENV) python3 tests/pc_desktop_vm.py "$(OUT)/melkor-pc.img" --log-dir "$(OUT)/desktop-tests" \
+		$(if $(filter 1,$(PC_DESKTOP_APPS)),--apps) $(if $(filter 1,$(PC_DESKTOP_CHROMIUM)),--chromium) \
+		$(if $(filter 1,$(PC_DESKTOP_UMBRIEL)),--umbriel) $(if $(filter 1,$(PC_DESKTOP_AUDIO)),--audio)
 
 tools:
 	mkdir -p out/tools
