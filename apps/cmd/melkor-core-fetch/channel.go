@@ -28,6 +28,7 @@ type release struct {
 	Schema   int       `json:"schema"`
 	Target   string    `json:"target"`
 	Revision uint32    `json:"revision"`
+	Profile  string    `json:"profile,omitempty"`
 	Expires  time.Time `json:"expires"`
 	URL      string    `json:"url"`
 	SHA256   string    `json:"sha256"`
@@ -109,7 +110,7 @@ func verifyRelease(document, publicPEM []byte, now time.Time) (release, error) {
 	return entry, nil
 }
 
-func fromChannel(ctx context.Context, config, staging string, transport http.RoundTripper,
+func fromChannel(ctx context.Context, config, staging, profile string, transport http.RoundTripper,
 	now time.Time, install func(string, string) error) (string, error) {
 	public, err := os.ReadFile(filepath.Join(config, "channel.pem"))
 	if errors.Is(err, os.ErrNotExist) {
@@ -126,9 +127,14 @@ func fromChannel(ctx context.Context, config, staging string, transport http.Rou
 	if err != nil {
 		return "", fmt.Errorf("revisão instalada inválida: %w", err)
 	}
-	source, err := os.ReadFile(filepath.Join(staging, "channel"))
-	if errors.Is(err, os.ErrNotExist) {
-		source, err = os.ReadFile(filepath.Join(config, "channel"))
+	var source []byte
+	if profile == "desktop" {
+		source, err = os.ReadFile(filepath.Join(config, "desktop"))
+	} else {
+		source, err = os.ReadFile(filepath.Join(staging, "channel"))
+		if errors.Is(err, os.ErrNotExist) {
+			source, err = os.ReadFile(filepath.Join(config, "channel"))
+		}
 	}
 	if err != nil {
 		return "", err
@@ -140,6 +146,9 @@ func fromChannel(ctx context.Context, config, staging string, transport http.Rou
 	entry, err := verifyRelease(document, public, now)
 	if err != nil {
 		return "", err
+	}
+	if entry.Profile != profile {
+		return "", errors.New("manifesto incompatível com o perfil solicitado")
 	}
 	if uint64(entry.Revision) < current {
 		return "", fmt.Errorf("o canal anunciou a revisão anterior %d (instalada: %d)", entry.Revision, current)

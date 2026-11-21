@@ -5,6 +5,7 @@ import (
 	"crypto/ecdh"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -68,7 +69,8 @@ func TestChannel(t *testing.T) {
 		}
 		return encoded
 	}
-	r := release{1, pcTarget, 3, now.Add(time.Hour), "https://example.invalid/update.raucb", strings.Repeat("a", 64)}
+	r := release{Schema: 1, Target: pcTarget, Revision: 3, Expires: now.Add(time.Hour),
+		URL: "https://example.invalid/update.raucb", SHA256: strings.Repeat("a", 64)}
 	stable := makeDocument(r, false)
 	tampered := makeDocument(r, true)
 	r.Revision = 2
@@ -137,7 +139,7 @@ func TestChannel(t *testing.T) {
 				t.Fatal(err)
 			}
 			called := false
-			message, err := fromChannel(ctx, config, staging, client, now, func(url, digest string) error {
+			message, err := fromChannel(ctx, config, staging, "", client, now, func(url, digest string) error {
 				called = true
 				if !strings.HasPrefix(url, "https://") || strings.Repeat("a", 64) != digest {
 					t.Fatal(url, digest)
@@ -156,14 +158,78 @@ func TestChannel(t *testing.T) {
 			}
 		})
 	}
+	// O canal adicional usa o endereço de fábrica e exige finalidade assinada.
+	bundle := []byte("bundle de desktop")
+	desktop := httptest.NewUnstartedServer(nil)
+	defer desktop.Close()
+	r.Profile = "desktop"
+	r.Revision = 3
+	r.Expires = time.Now().Add(time.Hour)
+	r.URL = "https://" + desktop.Listener.Addr().String() + "/bundle"
+	r.SHA256 = fmt.Sprintf("%x", sha256.Sum256(bundle))
+	desktopRelease := makeDocument(r, false)
+	desktop.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case "/manifesto":
+			w.Write(desktopRelease)
+		case "/base":
+			w.Write(stable)
+		case "/bundle":
+			w.Write(bundle)
+		default:
+			http.NotFound(w, req)
+		}
+	})
+	desktop.StartTLS()
+	for name, value := range map[string]string{
+		filepath.Join(config, "desktop"):  desktop.URL + "/manifesto",
+		filepath.Join(staging, "channel"): server.URL + "/stable",
+	} {
+		if err := os.WriteFile(name, []byte(value+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	signedBundleInstalled := false
+	if err := dispatch(ctx, []string{"--desktop"}, config, staging, os.Getuid(), desktop.Client().Transport,
+		func(_ context.Context, filename string) error {
+			data, err := os.ReadFile(filename)
+			if err != nil || string(data) != string(bundle) {
+				t.Fatalf("bundle = %q, erro = %v", data, err)
+			}
+			signedBundleInstalled = true
+			return nil
+		}); err != nil || !signedBundleInstalled {
+		t.Fatalf("instalação = %v, erro = %v", signedBundleInstalled, err)
+	}
+	if err := os.WriteFile(filepath.Join(config, "desktop"), []byte(desktop.URL+"/base"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fromChannel(ctx, config, staging, "desktop", desktop.Client().Transport, now, func(string, string) error {
+		t.Fatal("bundle do canal da base não pode passar pelo canal desktop")
+		return nil
+	}); err == nil || !strings.Contains(err.Error(), "perfil solicitado") {
+		t.Fatalf("esperava erro de perfil: %v", err)
+	}
+	if err := setChannel(staging, desktop.URL+"/manifesto"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fromChannel(ctx, config, staging, "", desktop.Client().Transport, now, func(string, string) error {
+		t.Fatal("bundle do desktop não pode passar pelo canal da base")
+		return nil
+	}); err == nil || !strings.Contains(err.Error(), "perfil solicitado") {
+		t.Fatalf("esperava erro de perfil: %v", err)
+	}
+	if err := setChannel(staging, ""); err != nil {
+		t.Fatal(err)
+	}
 	fail := func(string, string) error { return fmt.Errorf("recusa do RAUC") }
-	if _, err := fromChannel(ctx, config, staging, client, now, fail); err == nil || err.Error() != "recusa do RAUC" {
+	if _, err := fromChannel(ctx, config, staging, "", client, now, fail); err == nil || err.Error() != "recusa do RAUC" {
 		t.Fatalf("recusa perdida: %v", err)
 	}
 	if err := os.Remove(filepath.Join(config, "channel.pem")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fromChannel(ctx, config, staging, client, now, fail); err == nil || !strings.Contains(err.Error(), "chave pública") {
+	if _, err := fromChannel(ctx, config, staging, "", client, now, fail); err == nil || !strings.Contains(err.Error(), "chave pública") {
 		t.Fatalf("imagem sem chave: %v", err)
 	}
 	native := func(context.Context, string) error { t.Fatal("instalação inesperada"); return nil }

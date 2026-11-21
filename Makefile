@@ -83,7 +83,8 @@ channel-pc: BOARD = pc
 channel-pc:
 	$(BUILD_ENV) python3 scripts/channel-pc.py "$(OUT)/build" "$(OUT)/melkor-pc-$(VERSION).raucb" \
 		--keyring "$(KEYRING)" --key "$(CHANNEL_KEY)" --url "$(BUNDLE_URL)" \
-		--days "$(or $(CHANNEL_DAYS),90)" --output "$(OUT)/melkor-pc-channel.json"
+		--days "$(or $(CHANNEL_DAYS),90)" $(if $(filter 1,$(CHANNEL_DESKTOP)),--desktop) \
+		--output "$(OUT)/$(if $(filter 1,$(CHANNEL_DESKTOP)),melkor-pc-desktop.json,melkor-pc-channel.json)"
 
 test-update: BOARD = m1
 test-update:

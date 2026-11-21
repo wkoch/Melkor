@@ -29,7 +29,9 @@ Ao concluir, reinicie sem a mídia e entre como `melkor`. A base abre no console
 
 ### Instalar o desktop depois
 
-Copie o arquivo local assinado `melkor-desktop.raucb` para um pendrive FAT32 com rótulo `MELKOR_APPS`. Após iniciar pelo SSD, conecte o pendrive e execute `su -` com a senha de root. Em seguida, rode `melkor-finalizar`. Se a partição de dados do Ventoy já estiver em FAT32 e tiver rótulo `Ventoy`, use a mesma mídia com `melkor-finalizar Ventoy`. O comando aceita o rótulo da mídia como argumento.
+Com o canal do desktop publicado, conecte-se ao Wi-Fi com `iwctl`, entre com `su -` e rode `melkor-finalizar`. O comando baixa o manifesto assinado e o bundle por HTTPS. A primeira ISO com seleção numérica inclui a versão de pendrive do comando. O download automático exige uma imagem que inclua o novo atualizador.
+
+Para instalar pelo pendrive, copie o arquivo local assinado `melkor-desktop.raucb` para uma partição FAT32. Na sessão root, rode `melkor-finalizar MELKOR_APPS` se esse for o rótulo da partição. Para usar uma partição FAT32 do Ventoy rotulada `Ventoy`, rode `melkor-finalizar Ventoy`.
 
 Aguarde o RAUC concluir com sucesso e reinicie. O RAUC grava o desktop no slot inativo e preserva o volume com os dados, as senhas e a configuração do Wi-Fi. No próximo boot, o login gráfico abre Umbriel e Noctalia. O bundle inclui Alacritty, Nushell, Firefox ESR, Brave Origin e Blanc.
 

@@ -266,3 +266,7 @@ O Buildroot reconfigurou o alvo PC com `MELKOR_PC_MINIMAL=1`, recompôs a raiz d
 `tests/installer_vm.py --ventoy-drive … --desktop-bundle …` passou com a ISO final no QEMU, com OVMF e Ventoy 1.1.18. A confirmação inválida preservou o destino e o NVMe vizinho manteve seu SHA-256. A base iniciou por A e por B. `melkor-finalizar` promoveu o desktop pelo RAUC. Após o reboot, a senha provisionada de 128 bytes abriu Umbriel e Noctalia, e os três navegadores reproduziram áudio na HDA virtual. A mesma ISO passou também como CD UEFI com setores lógicos de 4096 bytes. Registros em `out/pc-instalacao-minima/evidence-final/` e `out/pc-instalacao-minima/evidence-4kn/`.
 
 `make test` passou com 53 testes Python e cobertura de 80,8% em Go, 92,0% em Python e 97,6% em Shell. O novo comando de finalização atingiu 100% das linhas instrumentadas.
+
+### Preparação do canal HTTPS do desktop
+
+`melkor-finalizar` ganhou um canal exclusivo com manifesto assinado. O teste TLS local confirmou o download do bundle pelo SHA-256 e a recusa de manifestos trocados entre a base e o desktop. `make test` passou com 81,0% em Go, 92,1% em Python e 97,7% em Shell. O diretório `publicacao` ficou configurado para o Netlify. A ativação depende do domínio, da publicação do bundle desktop e de uma imagem que inclua o cliente atualizado.

@@ -424,6 +424,7 @@ melkor-core-update() {
     printf 'update %s\\n' "$(cat "$1")" >> "$TEST_BOOT_LOG"
     return "$TEST_UPDATE_CODE"
 }
+exec() { printf '%s\\n' "$*" >> "$TEST_BOOT_LOG"; exit 0; }
 script=$1
 shift
 source "$script" "$@"
@@ -433,8 +434,10 @@ source "$script" "$@"
                    TEST_BUNDLE="yes", TEST_UPDATE_CODE="0")
         self.run_script(wrapper, script, code=2, **(env | {"TEST_UID": "1000"}))
         self.run_script(wrapper, script, "Ventoy", "extra", code=2, **env)
+        self.run_script(wrapper, script, **env)
+        self.assertEqual(self.boot_log.read_text(), "melkor-core-update --desktop\n")
         for invalid in ("no", "multiple"):
-            self.run_script(wrapper, script, code=1, **(env | {"TEST_MEDIA": invalid}))
+            self.run_script(wrapper, script, "MELKOR_APPS", code=1, **(env | {"TEST_MEDIA": invalid}))
         for status, options in ((1, {"TEST_BUNDLE": "no"}), (42, {"TEST_UPDATE_CODE": "42"}), (0, {})):
             self.boot_log.write_text("")
             self.run_script(wrapper, script, "Ventoy", code=status, **(env | options))
@@ -598,12 +601,13 @@ source "$script" "$@"
     def test_canal_do_pc_exige_root_e_usa_a_trava(self):
         update = self.project / "core/board/m1/rootfs-overlay/usr/sbin/melkor-core-update"
         source = "https://example.invalid/channel.json"
-        for args in ((), ("--channel", source), ("--reset-channel",)):
+        for args in ((), ("--channel", source), ("--reset-channel",), ("--desktop",)):
             self.run_script(self.update, update, *args, code=1, TEST_UID="1000", TEST_CORE_FETCH="yes")
             self.run_script(self.update, update, *args, TEST_UID="0", TEST_CORE_FETCH="yes")
         prefix = "/usr/bin/flock --nonblock /run/melkor/rauc.lock /usr/bin/melkor-core-fetch"
         self.assertEqual(self.boot_log.read_text().splitlines(),
-                         [prefix, f"{prefix} --channel {source}", f"{prefix} --reset-channel"])
+                         [prefix, f"{prefix} --channel {source}", f"{prefix} --reset-channel",
+                          f"{prefix} --desktop"])
 
     def test_boot_monta_alvos_e_interrompe_em_falha(self):
         board = self.project / "core/board"

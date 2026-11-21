@@ -90,8 +90,12 @@ func dispatch(ctx context.Context, args []string, config, staging string, uid in
 		return err
 	}
 	switch {
-	case len(args) == 0:
-		message, err := fromChannel(ctx, config, staging, transport, time.Now(), func(url, digest string) error {
+	case len(args) == 0 || (len(args) == 1 && args[0] == "--desktop"):
+		profile := ""
+		if len(args) == 1 {
+			profile = "desktop"
+		}
+		message, err := fromChannel(ctx, config, staging, profile, transport, time.Now(), func(url, digest string) error {
 			return run(ctx, []string{url, digest}, uid, staging, transport, install)
 		})
 		if err == nil {

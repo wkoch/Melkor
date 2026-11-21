@@ -22,6 +22,7 @@ class ChannelPCTest(unittest.TestCase):
             key = build / "channel.key"
             anchor = build / "rauc.pem"
             manifest = "[update]\ncompatible=melkor-pc-x86_64\n"
+            graphical = True
 
             def extract(args, **_):
                 self.assertEqual(args[1], f"--keyring={anchor}")
@@ -31,6 +32,10 @@ class ChannelPCTest(unittest.TestCase):
 
             def command(args):
                 if args[0].name == "unsquashfs":
+                    if args[-1] == "etc/dinit.d/graphical-login":
+                        if not graphical:
+                            raise subprocess.CalledProcessError(1, args)
+                        return b"type = process\n"
                     self.assertEqual(args[-1], "etc/melkor-update/revision")
                     return b"3\n"
                 self.assertIn("-rawin", args)
@@ -44,12 +49,20 @@ class ChannelPCTest(unittest.TestCase):
                 self.assertEqual(actual["target"], "melkor-pc-x86_64")
                 self.assertEqual(actual["sha256"], "1e6ed65d77d6364eeaed5a745ba5c4985ae2b700dd85d7cf7f027bdf294a33fc")
                 self.assertEqual(len(b64decode(envelope["signature"])), 64)
+                self.assertNotIn("profile", actual)
                 output = build / "channel.json"
                 argv = [str(SCRIPT), str(build), str(original), "--keyring", str(anchor),
                         "--key", str(key), "--url", actual["url"], "--output", str(output)]
                 with patch.object(sys, "argv", argv):
                     runpy.run_path(str(SCRIPT), run_name="__main__")
                 self.assertEqual(json.loads(output.read_text())["signature"], envelope["signature"])
+                with patch.object(sys, "argv", [*argv, "--desktop"]):
+                    runpy.run_path(str(SCRIPT), run_name="__main__")
+                desktop = json.loads(b64decode(json.loads(output.read_text())["payload"]))
+                self.assertEqual(desktop["profile"], "desktop")
+                graphical = False
+                with self.assertRaises(subprocess.CalledProcessError):
+                    sign(build, original, anchor, key, actual["url"], 1, desktop=True)
                 manifest = "[update]\ncompatible=melkor-m1-x86_64\n"
                 with self.assertRaisesRegex(ValueError, "bundle do PC"):
                     sign(build, original, anchor, key, "https://example.invalid/update.raucb", 1)

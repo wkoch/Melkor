@@ -6,7 +6,7 @@ O marco M0 entrega uma imagem x86-64 que inicia por UEFI e chega ao console seri
 
 ## Testar a primeira prévia
 
-O fluxo padrão começa com o PC Core por UEFI, com console, Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. O instalador atualizado usa o número do SSD e a confirmação `APAGAR`. Depois de iniciar pelo SSD, aplique o bundle assinado do desktop. [Instalação em duas etapas](docs/INSTALACAO.md#instalação-da-base-no-disco-inteiro) · [Primeira release pública do PC Core](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.4-core)
+O fluxo padrão começa com o PC Core por UEFI, com console, Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. O instalador atualizado usa o número do SSD e a confirmação `APAGAR`. Depois de iniciar pelo SSD, `melkor-finalizar` aplica o bundle assinado do desktop. [Instalação em duas etapas](docs/INSTALACAO.md#instalação-da-base-no-disco-inteiro) · [Publicação do canal do desktop](docs/TESTES.md#canal-do-desktop)
 
 Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot serial. A prévia inclui dinit, slots A/B, armazenamento persistente e DNS do sistema via Quad9 DoH. A release também oferece o CLI de aplicativos para o host Linux x86-64. A instalação em computador físico faz parte do M4. [Melkor v0.1.0-alpha.1](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
 

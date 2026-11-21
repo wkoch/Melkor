@@ -15,7 +15,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 
 
-def sign(build, bundle, keyring, key, url, days):
+def sign(build, bundle, keyring, key, url, days, desktop=False):
     source = urlsplit(url)
     if source.scheme != "https" or not source.hostname or source.username is not None:
         raise ValueError("Informe a URL HTTPS do bundle sem credenciais.")
@@ -43,8 +43,11 @@ def sign(build, bundle, keyring, key, url, days):
         with verified.open("rb") as stream:
             digest = file_digest(stream, "sha256").hexdigest()
         expires = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=days)
-        payload = json.dumps(dict(schema=1, target=target, revision=revision, expires=expires.isoformat(),
-                                  url=url, sha256=digest)).encode("utf-8")
+        release = dict(schema=1, target=target, revision=revision, expires=expires.isoformat(), url=url, sha256=digest)
+        if desktop:
+            subprocess.check_output([host / "unsquashfs", "-cat", image, "etc/dinit.d/graphical-login"])
+            release["profile"] = "desktop"
+        payload = json.dumps(release).encode("utf-8")
         signed = work / "payload"
         signed.write_bytes(payload)
         signature = subprocess.check_output([host / "openssl", "pkeyutl", "-sign", "-rawin",
@@ -62,10 +65,11 @@ def main():
     parser.add_argument("--key", required=True, type=Path)
     parser.add_argument("--url", required=True)
     parser.add_argument("--days", type=int, default=90)
+    parser.add_argument("--desktop", action="store_true")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     try:
-        document = sign(args.build, args.bundle, args.keyring, args.key, args.url, args.days)
+        document = sign(args.build, args.bundle, args.keyring, args.key, args.url, args.days, args.desktop)
         with TemporaryDirectory(prefix=".channel-", dir=args.output.parent) as directory:
             candidate = Path(directory) / args.output.name
             candidate.write_text(document + "\n", encoding="utf-8")

@@ -6,7 +6,11 @@ if [ "$(id -u)" != 0 ] || [ "$#" -gt 1 ]; then
     exit 2
 fi
 
-label=${1:-MELKOR_APPS}
+if [ "$#" -eq 0 ]; then
+    exec melkor-core-update --desktop
+fi
+
+label=$1
 media=$(blkid -t "LABEL=$label" -o device) || media=
 if ! test -b "$media"; then
     printf 'Conecte um pendrive FAT32 com o rótulo %s.\n' "$label" >&2

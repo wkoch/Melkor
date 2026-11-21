@@ -134,7 +134,7 @@ def stage_desktop(vm, log, passwords):
         console.expect(rb"^[^\n]*# ", "shell administrativo")
         guest(console, "for attempt in $(seq 1 15); do blkid -t LABEL=MELKOR_APPS -o device && exit 0; sleep 1; done; "
               "blkid; dmesg | tail -30; exit 1")
-        guest(console, "melkor-finalizar && sync")
+        guest(console, "melkor-finalizar MELKOR_APPS && sync")
 
 
 def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None, graphical=False, desktop_bundle=None):

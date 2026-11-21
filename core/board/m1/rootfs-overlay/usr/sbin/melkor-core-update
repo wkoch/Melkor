@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-if [ "$#" -eq 0 ] || [ "${1:-}" = --channel ] || [ "${1:-}" = --reset-channel ]; then
+if [ "$#" -eq 0 ] || [ "${1:-}" = --channel ] || [ "${1:-}" = --reset-channel ] ||
+    [ "${1:-}" = --desktop ]; then
     if test -x /usr/bin/melkor-core-fetch; then
         if [ "$(id -u)" != 0 ]; then
             printf '%s\n' 'Entre em uma sessão root para atualizar o core.' >&2
