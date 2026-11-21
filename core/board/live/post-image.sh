@@ -18,7 +18,12 @@ test -s "$stage/rootfs.cpio.gz"
 
 mkdir -p "$stage/boot/grub"
 install -m 0644 "$board_dir/grub.cfg" "$stage/boot/grub/grub.cfg"
-"$HOST_DIR/bin/xorriso" -as mkisofs -R -V MELKOR_LIVE \
+# O Ventoy consulta o rótulo para escolher a arquitetura do init que injeta.
+# Mantenha os arquivos lidos pelo GRUB no começo da ISO.
+"$HOST_DIR/bin/xorriso" -as mkisofs -R -V MELKOR_LIVE_x86_64 \
+    --sort-weight 10 /rootfs.cpio.gz --sort-weight 9 /bzImage \
+    --sort-weight 8 /EFI/BOOT/bootx64.efi --sort-weight 7 /EFI/BOOT/grub.cfg \
+    --sort-weight 6 /boot/grub/grub.cfg \
     -e boot/efi.img -no-emul-boot -follow-links \
     -o "$BINARIES_DIR/melkor-live.iso" -graft-points \
     "/=$stage" "boot/efi.img=$BINARIES_DIR/melkor-live-eltorito.vfat"

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+umask 077
+session=$(mktemp -d /tmp/melkor-wayland.XXXXXX)
+trap 'rm -rf -- "$session"' EXIT
+export XDG_RUNTIME_DIR="$session"
+export LIBSEAT_BACKEND=seatd
+export LANG=C.UTF-8
+dbus-run-session -- weston --renderer=pixman

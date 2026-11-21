@@ -8,9 +8,9 @@ buildroot_remote=https://gitlab.com/buildroot.org/buildroot.git
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 board=${2:-m0}
 case "$board" in
-    m0|m1) rootfs_option=BR2_TARGET_ROOTFS_SQUASHFS ;;
+    m0|m1|pc) rootfs_option=BR2_TARGET_ROOTFS_SQUASHFS ;;
     live) rootfs_option=BR2_TARGET_ROOTFS_CPIO_GZIP ;;
-    *) echo "Alvo desconhecido: $board. Use BOARD=m0, BOARD=m1 ou BOARD=live." >&2; exit 2 ;;
+    *) echo "Alvo desconhecido: $board. Use BOARD=m0, m1, live ou pc." >&2; exit 2 ;;
 esac
 output=$(realpath -m -- "${1:-out/$board}")
 cache="$project/out/dl"
@@ -72,8 +72,9 @@ toolchain="$build/host/bin/x86_64-buildroot-linux-musl"
 
 cd -- "$build/images"
 images=("melkor-$board.img")
-if [[ "$board" == live ]]; then
-    images+=(melkor-live.iso)
-fi
+case "$board" in
+    live) images+=(melkor-live.iso) ;;
+    pc) images=(rootfs.squashfs bzImage efi-part/EFI/BOOT/bootx64.efi) ;;
+esac
 sha256sum "${images[@]}" > "$output/SHA256SUMS"
-printf 'Imagem gerada em %s/melkor-%s.img\n' "$PWD" "$board"
+printf 'Imagem gerada em %s\n' "${images[@]/#/$PWD/}"

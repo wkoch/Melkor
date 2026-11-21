@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+install -d -m 0700 /run/melkor/esp /run/rauc /persist/rauc
+mount -t vfat -o rw,nosuid,nodev,noexec,fmask=0177,dmask=0077 /run/melkor/esp-device /run/melkor/esp

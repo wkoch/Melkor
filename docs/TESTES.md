@@ -64,6 +64,26 @@ O teste Live verifica a presença do firmware da AX200 e dos dois arquivos da ba
 
 Depois da validação virtual, use a mídia no notebook para conferir o console com tela e teclado locais e obter os IDs dos componentes. [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 
+### Associação Wi-Fi em QEMU
+
+Após `make image BOARD=live`, compile `mac80211_hwsim` a partir da mesma árvore Linux e com o compilador do build. Os comandos abaixo usam a saída padrão com Linux 6.12.117 dentro do contêiner de build.
+
+```sh
+linux="$PWD/out/live/build/build/linux-6.12.117"
+make -C "$linux" M=drivers/net/wireless/virtual ARCH=x86 \
+    CROSS_COMPILE="$PWD/out/live/build/host/bin/x86_64-buildroot-linux-musl-" \
+    CONFIG_MAC80211_HWSIM=m modules
+make test-live-wifi HWSIM="$linux/drivers/net/wireless/virtual/mac80211_hwsim.ko"
+```
+
+O executor monta uma camada de initramfs descartável com dois rádios e inicia a VM sem interfaces QEMU ligadas ao host. A conta comum cria um ponto de acesso WPA2 em um rádio, associa o segundo com `iwctl` e confirma o SSID com `iw`. O módulo fica fora da mídia distribuída. O teste de endereçamento e DoH usa um adaptador Ethernet distinto, com `make test-dns BOARD=live` e, em um host com IPv6, `make test-dns BOARD=live DNS_IPV6_ONLY=1`.
+
+## Protótipo de disco PC
+
+Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` para gerar um arquivo regular com GPT e 16 GiB lógicos. O gerador exige Go no host, além de `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools` e `grub-editenv`. Os testes unitários exercitam os limites do particionamento, a validação do SquashFS e a preservação de arquivos preexistentes. `make test-pc-disk` usa uma cópia de trabalho com QEMU e OVMF. Ele confirma boot UEFI pelos dois slots no mesmo NVMe virtual, o conteúdo do home e a ativação do swap de 4 GiB. `make test-pc-desktop` usa outra cópia e verifica login no console de vídeo, Weston como usuário comum e abertura de foot pelo painel.
+
+Para testar o RAUC nesse disco, use o procedimento de credenciais descartáveis descrito para o M1 e troque o alvo de build para `BOARD=pc`. Execute `make pc-disk` com o mesmo `OUT`, `make bundle-pc` com o certificado desse laboratório e `make test-update BOARD=pc` com o mesmo certificado, a chave e o arquivo da senha de root. A diferença de identificador RAUC entre PC e M1 também é um caso de rejeição.
+
 ## Protótipo A/B do M1
 
 Execute `make check-m1` com a imagem já gerada, Python, `sfdisk` e `blkid`. A verificação inspeciona o GPT, os quatro sistemas de arquivos, o estado inicial do GRUB, a associação entre os `PARTUUIDs` e os slots do RAUC, os kernels e o UUID usado para montar os dados. Ela lê o arquivo de disco sem criar dispositivos de bloco no host.

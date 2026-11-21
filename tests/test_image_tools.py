@@ -30,7 +30,7 @@ PROBE = b"M0-ID=melkor\nM0-PID1=dinit\nM0-LOGIN=melkor\nM0-UEFI=yes\nM0-ROOT=squ
 MENU = b"Melkor Linux M1 - slot B\nPress enter to boot the selected OS\n*Melkor Linux M1 - slot A\n"
 LIVE = (b"LIVE-VERSION=live\nLIVE-USER=ok\nLIVE-DISPLAY=ok\nLIVE-DEVICES=ok\n"
         b"LIVE-PERMISSIONS=ok\nLIVE-TOOLS=ok\nLIVE-RAM=ok\nLIVE-HOME=ok\nLIVE-END\n"
-        b"LIVE-FIRMWARE=ok\nLIVE-REGDB=ok\nLIVE-WIFI-END\n")
+        b"LIVE-FIRMWARE=ok\nLIVE-REGDB=ok\nLIVE-IWD=ok\nLIVE-WIFI-END\n")
 
 
 class BundleTest(unittest.TestCase):
@@ -75,6 +75,14 @@ class BundleTest(unittest.TestCase):
         self.assertEqual(self.output.read_bytes(), b"bundle de teste")
         self.assertEqual(list(self.build.glob(".bundle-*")), [])
 
+    def test_cli_pc_seleciona_capacidade_e_compatibilidade_proprias(self):
+        argv = ["bundle-m1.py", str(self.build), "--pc", "--cert", str(self.cert), "--key", str(self.key),
+                "--keyring", str(self.cert), "--version", "1.0", "--output", str(self.output)]
+        with patch.object(sys, "argv", argv), patch.object(bundle, "create_bundle") as create:
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(bundle.main(), 0)
+        self.assertEqual(create.call_args.args[-2:], ("melkor-pc-x86_64", 2 * 1024 ** 3))
+
     def test_recusa_entradas_invalidas_e_limpa_assinatura_incompleta(self):
         with self.assertRaisesRegex(ValueError, "versão"):
             self.create("nova\n[update]")
@@ -112,7 +120,8 @@ class SerialTest(unittest.TestCase):
             boot.check_live_console(process, io.BytesIO(), timeout=1)
             self.assertIn(boot.LIVE_PROBE.encode(), process.stdin.getvalue())
             self.assertIn(boot.LIVE_WIFI_PROBE.encode(), process.stdin.getvalue())
-        for field in (b"LIVE-RAM=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-USER=ok", b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok"):
+        for field in (b"LIVE-RAM=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-USER=ok",
+                      b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok", b"LIVE-IWD=ok"):
             with self.subTest(field=field), console(LOGIN + PROBE + LIVE.replace(field, b"")) as process:
                 with self.assertRaisesRegex(RuntimeError, field.decode()):
                     boot.check_live_console(process, io.BytesIO(), timeout=1)
@@ -141,6 +150,16 @@ class SerialTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "antes de confirmar"):
                 boot.check_console(process, io.BytesIO(), timeout=1, slot="B")
             self.assertEqual(process.stdin.getvalue(), b"\x1b[B")
+
+    def test_disco_pc_exige_arquivo_swap(self):
+        persist = (b"\nM1-VERSION=pc\nM1-SLOT=rauc.slot=A\nM1-DATA=rw,nosuid\n"
+                   b"M1-DOCUMENT=melkor-m1-persistencia\nM1-SYNC=ok\nM1-END\n")
+        with console(LOGIN + PROBE + b"\nPC-SWAP=ok\n" + persist) as process:
+            boot.check_console(process, io.BytesIO(), timeout=1, slot="A", pc=True)
+            self.assertIn(boot.PC_SWAP_PROBE.encode(), process.stdin.getvalue())
+        with console(LOGIN + PROBE + persist) as process:
+            with self.assertRaisesRegex(RuntimeError, "PC-SWAP=ok"):
+                boot.check_console(process, io.BytesIO(), timeout=1, slot="A", pc=True)
 
     def test_boot_rejeita_identidade_ou_raiz_incorreta(self):
         for target, replacement, error in (
@@ -185,7 +204,7 @@ class BootRunnerTest(unittest.TestCase):
         for file in (self.code, self.variables, self.disk):
             file.write_bytes(file.name.encode())
         self.args = argparse.Namespace(
-            image=self.disk, ovmf_code=self.code, ovmf_vars=self.variables, ab=False, live=False,
+            image=self.disk, ovmf_code=self.code, ovmf_vars=self.variables, ab=False, live=False, pc=False,
             accel="auto", timeout=None,
         )
 

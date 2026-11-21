@@ -1,0 +1,3 @@
+# Conta da mídia temporária. A senha de laboratório é melkor.
+- - netdev -1 - - - - -
+melkor 1000 melkor 1000 $6$melkor-m0$470inhuImxeGkBZsEUsOmIqxhecSlisW3pouUdfsuzuNwZ3fbxG.irLrNFnfKfOY2k877tmIm/TFAk5g.54BK1 /home/melkor /bin/sh netdev Console-Live

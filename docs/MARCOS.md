@@ -170,3 +170,21 @@ A alpha.3 embute o firmware no kernel, habilita PCI MSI e inclui a base regulat�
 | `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | Cobertura de 86,7% em Go, 95,3% em Python e 96,9% em Shell. Os boots de regressão do M0 e do M1 passaram. |
 
 O SHA-256 da ISO é `b1570905e948e0c20a21fb194b625f0c884336afea637669da49ca320795570b`.
+
+### Integração em QEMU do disco PC
+
+O alvo `pc` exercita a distribuição de espaço em disco, a atualização do core e uma sessão Wayland com Weston. O ambiente Fedora 45 compilou os novos pacotes após configurar o alvo PC e reutilizou a toolchain do Buildroot já verificada. O gerador atua sobre arquivos regulares e a instalação física continua pendente.
+
+| Comando ou cenário | Resultado |
+| --- | --- |
+| `make check-env BOARD=pc` | O contêiner `melkor-build`, o bundle fixado e as fontes do alvo passaram na verificação offline. |
+| `make pc-disk OUT=out/pc-validated` | O gerador Go preparou a GPT, a ESP, os dois slots SquashFS e a ext4. Os testes de unidade cobrem a geometria com setores lógicos de 512 e 4096 bytes, a recusa de um SHA-256 divergente e a preservação de arquivos existentes. |
+| `QEMU_ACCEL=tcg make test-pc-disk OUT=out/pc-validated` | Com OVMF, os dois slots iniciaram no mesmo NVMe virtual. O slot B reabriu o documento criado em A e os dois ativaram o swap de 4 GiB. Evidências em `out/pc-validated/tests/boot-oypthttp/`. |
+| `make test-pc-desktop OUT=out/pc-validated` | Com KVM, VGA virtual e OVMF, a conta comum entrou pelo console local e iniciou Weston com DRM. O teste abriu foot pelo painel e capturou as telas. Evidências em `out/pc-validated/desktop-tests/desktop-r6ugrtse/`. |
+| `make test-live-wifi OUT=out/pc-live-validated HWSIM=…` | Com QEMU e dois rádios `mac80211_hwsim`, a conta comum criou um ponto de acesso com WPA2 e se conectou a ele. Evidências em `out/pc-live-validated/wifi-tests/wifi-901hh8xs/`. |
+| Ventoy 1.1.18 por UEFI e TCG | A ISO com o rótulo `MELKOR_LIVE_x86_64` e os arquivos usados pelo GRUB no início passou pelos modos normal e GRUB2. O arquivo ISO ocupava dois trechos na partição FAT32 do pendrive virtual. A conta local autenticou nos dois modos e o hash do NVMe permaneceu igual. Evidências em `out/ventoy-lab/pc-layout-normal/` e `out/ventoy-lab/pc-layout-grub2/`. |
+| `make test-dns BOARD=live OUT=out/pc-live-validated` e `make test-dns BOARD=pc OUT=out/pc-validated`, ambos com e sem `DNS_IPV6_ONLY=1` | O Quad9 respondeu por HTTPS. As capturas de rede do QEMU também confirmaram a falha da consulta sem recurso a DNS em texto claro quando o acesso ao Quad9 foi interrompido. O enlace dos testes de DNS foi Ethernet virtual. |
+| `make bundle-pc OUT=out/pc-rauc-lab …` e `QEMU_ACCEL=tcg make test-update BOARD=pc OUT=out/pc-rauc-lab …` | O core recusou bundle adulterado, assinatura inválida e uma imagem para M1. O teste confirmou a atualização A → B, a volta automática a A após falha de confirmação e nova instalação após interromper a gravação. O documento do usuário persistiu. Evidências em `out/pc-rauc-lab/update-tests/rauc-i5b9nxu6/`. |
+| `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | 36 testes Python e cobertura de 84,9% em Go, 94,5% em Python e 96,9% em Shell. |
+
+A sessão do PC ainda usa as credenciais de laboratório. A instalação em disco real, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam em desenvolvimento.

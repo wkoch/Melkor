@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Exercita login local, DRM, seatd e a abertura de um terminal via painel Wayland."""
+
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import socket
+import subprocess
+import tempfile
+import time
+from types import SimpleNamespace
+
+from m1_dns_vm import BOOT, guest
+
+
+def desktop(console, qmp, run):
+    BOOT["login"](console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
+    for char in "melkor\nmelkor\nmelkor-desktop >/tmp/melkor-gui.log 2>&1\n":
+        keys = {
+            " ": ["spc"], "\n": ["ret"], "-": ["minus"], "/": ["slash"], ".": ["dot"],
+            ">": ["shift", "dot"], "&": ["shift", "7"],
+        }.get(char, [char])
+        qmp("send-key", keys=[{"type": "qcode", "data": key} for key in keys], **{"hold-time": 45})
+        time.sleep(0.08)
+    try:
+        guest(console, "for attempt in $(seq 1 20); do "
+              'for device in /tmp/melkor-wayland.*/wayland-*; do [ -S "$device" ] && exit 0; done; '
+              "sleep 1; done; cat /tmp/melkor-gui.log; exit 1")
+        guest(console, 'pid=$(pidof -s weston) && awk \'$1=="Uid:" && $2==1000 {ok=1} END{exit !ok}\' '
+              '"/proc/$pid/status" && grep -iq pixman /tmp/melkor-gui.log')
+        time.sleep(1)
+        panel = run / "01-desktop.ppm"
+        qmp("screendump", filename=str(panel))
+        with panel.open("rb") as image:
+            assert image.readline().strip() == b"P6", "Formato inesperado no screendump do QEMU."
+            width, height = map(int, image.readline().split())
+        qmp("input-send-event", events=[
+            {"type": "abs", "data": {"axis": axis, "value": 32767 * 16 // (extent - 1)}}
+            for axis, extent in (("x", width), ("y", height))
+        ])
+        for down in (True, False):
+            qmp("input-send-event", events=[{"type": "btn", "data": {"down": down, "button": "left"}}])
+        guest(console, "for attempt in $(seq 1 10); do pidof foot >/dev/null && exit 0; sleep 1; done; exit 1")
+        qmp("screendump", filename=str(run / "02-terminal.ppm"))
+    finally:
+        qmp("screendump", filename=str(run / "tela-final.ppm"))
+
+
+def run_test(image, run):
+    code, variables = BOOT["find_firmware"](SimpleNamespace(
+        ovmf_code=Path(code) if (code := os.environ.get("OVMF_CODE")) else None,
+        ovmf_vars=Path(variables) if (variables := os.environ.get("OVMF_VARS")) else None))
+    disk = run / "disk.img"
+    variables_copy = run / "OVMF_VARS.fd"
+    subprocess.run(["cp", "--reflink=auto", "--sparse=always", "--", image, disk], check=True)
+    shutil.copyfile(variables, variables_copy)
+    qemu = os.environ.get("QEMU_SYSTEM") or shutil.which("qemu-system-x86_64", path=BOOT["SYSTEM_PATH"])
+    if not qemu:
+        raise RuntimeError("QEMU não está no PATH.")
+    accel = "kvm" if os.access("/dev/kvm", os.R_OK | os.W_OK) else "tcg"
+    with tempfile.TemporaryDirectory(prefix="melkor-qmp-") as runtime:
+        monitor = Path(runtime) / "qmp.sock"
+        def drive(path, options):
+            return f"file={str(path).replace(',', ',,')},format=raw,{options}"
+        command = [qemu, "-machine", "q35", "-accel", accel, "-m", "1024", "-display", "none",
+                   "-serial", "stdio", "-monitor", "none", "-nic", "none", "-no-reboot",
+                   "-qmp", f"unix:{monitor},server=on,wait=off",
+                   "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
+                   "-drive", drive(variables_copy, "if=pflash,unit=1"),
+                   "-drive", drive(disk, "if=none,id=melkor"),
+                   "-device", "nvme,drive=melkor,serial=melkor-desktop,bootindex=1",
+                   "-vga", "std", "-device", "virtio-tablet-pci"]
+        with (run / "serial.log").open("wb") as log, subprocess.Popen(
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        ) as vm:
+            try:
+                for _ in range(100):
+                    if monitor.exists() or vm.poll() is not None:
+                        break
+                    time.sleep(0.05)
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as control:
+                    control.settimeout(10)
+                    control.connect(str(monitor))
+                    with control.makefile("rwb", buffering=0) as pipe:
+                        json.loads(pipe.readline())
+
+                        def qmp(operation, **arguments):
+                            pipe.write(json.dumps({"execute": operation, "arguments": arguments}).encode() + b"\n")
+                            while True:
+                                response = json.loads(pipe.readline())
+                                if "error" in response:
+                                    raise RuntimeError(response["error"])
+                                if "return" in response:
+                                    return response["return"]
+
+                        qmp("qmp_capabilities")
+                        time.sleep(5)
+                        qmp("screendump", filename=str(run / "00-boot.ppm"))
+                        with BOOT["serial_console"](vm, log, 120) as console:
+                            desktop(console, qmp, run)
+            finally:
+                vm.kill()
+                log.write(vm.stdout.read())
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("image", type=Path)
+    parser.add_argument("--log-dir", required=True, type=Path)
+    args = parser.parse_args()
+    args.log_dir.mkdir(parents=True, exist_ok=True)
+    run = Path(tempfile.mkdtemp(prefix="desktop-", dir=args.log_dir)).resolve()
+    print(f"Evidências em {run}", flush=True)
+    run_test(args.image, run)
+    print("Login local, Weston como usuário comum e abertura do foot no painel verificados.")
+
+
+if __name__ == "__main__":
+    main()

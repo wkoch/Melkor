@@ -1,0 +1,5 @@
+type = process
+command = /usr/bin/env STATE_DIRECTORY=/run/iwd DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket /usr/libexec/iwd
+depends-on = dbus
+restart = true
+logfile = /run/iwd.log

@@ -1,0 +1,6 @@
+type = process
+command = /usr/libexec/melkor-system-bus
+ready-notification = pipefd:4
+depends-on = setup
+restart = true
+logfile = /run/dbus.log

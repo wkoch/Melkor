@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verifica o resolvedor da imagem M1 pelo console e pela interface virtual."""
+"""Verifica o resolvedor do Melkor pelo console e pela interface virtual."""
 
 import argparse
 import json
@@ -90,8 +90,12 @@ def check_doh(console, server=""):
 
 def run(plan, work, isolated):
     work.mkdir()
+    optical = plan.image.suffix == ".iso"
     disk, variables, capture = work / "disk.img", work / "OVMF_VARS.fd", work / "traffic.pcap"
-    shutil.copyfile(plan.image, disk)
+    if optical:
+        disk = plan.image
+    else:
+        subprocess.run(["cp", "--reflink=auto", "--sparse=always", "--", plan.image, disk], check=True)
     shutil.copyfile(plan.variables, variables)
 
     def drive(path, options):
@@ -107,9 +111,13 @@ def run(plan, work, isolated):
                "-netdev", network, "-device", "virtio-net-pci,netdev=net",
                "-object", trace,
                "-drive", drive(plan.code, "if=pflash,unit=0,readonly=on"),
-               "-drive", drive(variables, "if=pflash,unit=1"),
-               "-drive", drive(disk, "if=none,id=melkor"),
-               "-device", "virtio-blk-pci,drive=melkor,bootindex=1"]
+               "-drive", drive(variables, "if=pflash,unit=1")]
+    if optical:
+        command.extend(("-drive", drive(disk, "if=none,id=melkor,media=cdrom"),
+                        "-device", "ide-cd,bus=ide.0,drive=melkor,bootindex=1"))
+    else:
+        command.extend(("-drive", drive(disk, "if=none,id=melkor"),
+                        "-device", "virtio-blk-pci,drive=melkor,bootindex=1"))
     if isolated:
         # Em RX do backend, o QEMU percorre os filtros da cauda para a cabeça.
         # A captura precisa ver o tráfego do convidado antes do descarte.

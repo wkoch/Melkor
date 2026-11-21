@@ -11,7 +11,7 @@ set -euo pipefail
 prepare_env() {
     local mode=$1 container_marker=$2 board=${3:-m0}
     case "$mode" in prepare|--check) ;; *) echo "Uso: $0 [--check]" >&2; exit 2 ;; esac
-    case "$board" in m0|m1|live) ;; *) echo "Alvo desconhecido: $board. Use BOARD=m0, BOARD=m1 ou BOARD=live." >&2; exit 2 ;; esac
+    case "$board" in m0|m1|live|pc) ;; *) echo "Alvo desconhecido: $board. Use BOARD=m0, m1, live ou pc." >&2; exit 2 ;; esac
 
     project=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
     container=${MELKOR_BUILD_CONTAINER:-melkor-build}

@@ -38,6 +38,12 @@ O RAUC 1.13 do core valida a assinatura CMS e o conteúdo do bundle no formato `
 
 O Buildroot 2025.02.20 fornece a receita, o hash de fonte e os patches do RAUC 1.13, do GRUB 2.12 e do util-linux 2.40.4. RAUC entra no core como atualizador e no ambiente de build como assinador. `grub-editenv` escreve o estado de boot e `blkid` identifica as partições na VM. A imagem confia nos certificados públicos fornecidos a `MELKOR_RAUC_KEYRING` no build. A chave privada fica no ambiente de assinatura.
 
+### Disco de laboratório do PC
+
+O alvo `pc` usa uma ESP de 128 MiB, dois slots de 2 GiB e ext4 no espaço disponível para dados. O gerador Go cria UUIDs novos, valida o SHA-256 do SquashFS e publica o arquivo de disco após completar a preparação. O GRUB encontra a raiz pelo `PARTUUID` do slot. No boot, `melkor-storage` encontra o disco-pai da raiz montada no `sysfs` e resolve os quatro dispositivos pela ordem e pelos nomes GPT. O dinit monta os dados antes do console e ativa um arquivo de swap de 4 GiB. O identificador RAUC do alvo é `melkor-pc-x86_64`.
+
+Para exercitar vídeo e entrada no PC, o core de laboratório inclui eudev 3.2.14, seatd 0.9.1, Weston 14.0.1 e foot 1.16.2, das receitas do Buildroot fixado. A sessão começa como usuário comum e usa DRM com Pixman. O módulo AMDGPU e o firmware do kernel entram no core para os testes do HP. A sessão prevista para uso diário integra Umbriel e Noctalia. O alvo PC atual usa credenciais de laboratório e é preparado em um arquivo regular para QEMU. [Requisitos de empacotamento do Umbriel](https://github.com/noctalia-dev/umbriel/blob/main/PACKAGING.md)
+
 ### Rede e DNS do core
 
 O dinit ativa a interface de loopback e supervisiona o `dhcpcd` 10.5.2, que configura endereços e rotas com separação de privilégios e guarda as concessões em `/run`. O cliente roda com os hooks de DHCP desativados. O `/etc/resolv.conf` faz parte do SquashFS de cada slot e aponta para o resolvedor de loopback.
@@ -46,9 +52,11 @@ O `dnsproxy` 0.86.0 roda com a conta dedicada `melkor-dns`. `setpriv`, do util-l
 
 O core inclui `ca-certificates` 20260816+nmu1 e `libcap-ng` 0.8.5 das receitas do Buildroot. Python 3.12.16 é uma dependência do host para montar o conjunto de certificados. O `tcpdump` do Fedora é usado no ambiente de testes para ler as capturas do QEMU.
 
+O Live e o PC usam a mesma configuração de Quad9 do M1. A receita fixada do Buildroot acrescenta IWD 3.0 ao Live e ao PC para associação Wi-Fi via D-Bus. A associação é acessível a usuários do grupo `netdev`, e o DHCP continua a cargo do `dhcpcd`. O Live guarda as redes em `/run/iwd`. O disco PC guarda as redes em `/persist/iwd`, diretório acessível apenas a root.
+
 ### Mídia de diagnóstico em RAM
 
-O alvo `live` gera uma ISO com entrada UEFI El Torito e uma imagem GPT com uma única ESP. O GRUB carrega o kernel e um initramfs comprimido. O dinit abre o login em `tty1` e no primeiro console serial. O sistema monta os sistemas de arquivos virtuais necessários para o console e mantém o home em RAM. Root permanece bloqueado e a mídia não inicia serviços para obter conectividade. O kernel disponibiliza framebuffer EFI, armazenamento USB e NVMe, AHCI e HID para sondar os dispositivos.
+O alvo `live` gera uma ISO com entrada UEFI El Torito e uma imagem GPT com uma única ESP. O GRUB carrega o kernel e um initramfs comprimido. O dinit abre o login em `tty1` e no primeiro console serial. O sistema monta os sistemas de arquivos virtuais necessários para o console e mantém o home em RAM. Root permanece bloqueado. O kernel disponibiliza framebuffer EFI, armazenamento USB e NVMe, AHCI e HID para sondar os dispositivos.
 
 O GNU xorriso 1.5.4.pl02 da receita do Buildroot roda no host de build. A imagem de boot EFI na ISO tem 30 MiB para que o catálogo El Torito registre seu tamanho em setores de 512 bytes. O kernel, o initramfs e a configuração do GRUB também estão no sistema de arquivos ISO 9660. [Formato El Torito no xorriso](https://www.gnu.org/software/xorriso/man_1_xorrisofs.html)
 

@@ -43,6 +43,11 @@ WRITE_DOCUMENT = (
     'printf "melkor-m1-persistencia\\n" > "$HOME/.melkor-m1-probe" && sync '
     '&& printf "\\nM1-SYNC=ok\\n"; '
 )
+PC_SWAP_PROBE = (
+    "for attempt in 1 2 3 4 5; do "
+    "awk '$1 == \"/persist/.swap/swapfile\" && $2 == \"file\" && $3 >= 4190000 "
+    "{ok=1} END {exit !ok}' /proc/swaps && { printf \"\\nPC-SWAP=ok\\n\"; break; }; sleep 1; done; "
+)
 LIVE_PROBE = (
     '. /etc/os-release; printf "\\nLIVE-VERSION=%s\\n" "$VERSION_ID"; '
     '[ "$(id -u)" -eq 1000 ] && printf "LIVE-USER=ok\\n"; '
@@ -62,6 +67,10 @@ LIVE_WIFI_PROBE = (
     'kernel_log=$(dmesg) && ! printf "%s\\n" "$kernel_log" | '
     'grep -Ei "failed to load regulatory[.]db|regulatory[.]db.*(malformed|invalid|error)" '
     '&& /usr/sbin/iw reg get | grep -q "^country 00:" && printf "LIVE-REGDB=ok\\n"; '
+    'for attempt in 1 2 3 4 5; do '
+    'dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus '
+    'org.freedesktop.DBus.NameHasOwner string:net.connman.iwd 2>/dev/null | grep -q "boolean true" '
+    '&& { printf "\\nLIVE-IWD=ok\\n"; break; }; sleep 1; done; '
     'printf "\\nLIVE-WIFI-END\\n"'
 )
 
@@ -132,18 +141,19 @@ def login(console, user, password, prompt):
     console.expect(prompt, "shell do convidado")
 
 
-def check_console(process, log, timeout, slot=None):
+def check_console(process, log, timeout, slot=None, pc=False):
     with serial_console(process, log, timeout) as console:
         if slot == "B":
-            selection = console.expect(rb"\*Melkor Linux M1 - slot [AB]", "menu de slots do GRUB")
+            label = b"Melkor Linux PC - slot " if pc else b"Melkor Linux M1 - slot "
+            selection = console.expect(rb"\*" + label + rb"[AB]", "menu de slots do GRUB")
             # A primeira marca aparece durante o desenho. Aguarde a contagem quando existir.
             console.expect(rb"The highlighted entry will be executed automatically in",
                            "contagem opcional do GRUB", wait=1)
-            if selection.endswith(b"*Melkor Linux M1 - slot A"):
+            if selection.endswith(b"*" + label + b"A"):
                 console.send(b"\x1b[B", end=b"")
-                selection = console.expect(rb"\*Melkor Linux M1 - slot B|Booting `Melkor Linux M1 - slot A'",
+                selection = console.expect(rb"\*" + label + rb"B|Booting `" + label + rb"A'",
                                            "seleção do slot B no GRUB")
-                if not selection.endswith(b"*Melkor Linux M1 - slot B"):
+                if not selection.endswith(b"*" + label + b"B"):
                     raise RuntimeError("O GRUB iniciou o slot A antes de confirmar a seleção de B.")
             console.send(b"")
 
@@ -152,8 +162,10 @@ def check_console(process, log, timeout, slot=None):
         result = console.expect(rb"^M0-END\r?$", "resposta das verificações")
         if slot:
             probe = (WRITE_DOCUMENT if slot == "A" else "") + PERSIST_PROBE
+            if pc:
+                probe = PC_SWAP_PROBE + probe
             console.send(probe.encode("ascii"))
-            persistent = console.expect(rb"^M1-END\r?$", "verificação de persistência do M1")
+            persistent = console.expect(rb"^M1-END\r?$", "verificação de persistência A/B")
 
     lines = result.splitlines()
     for expected in (b"M0-ID=melkor", b"M0-PID1=dinit", b"M0-LOGIN=melkor", b"M0-UEFI=yes"):
@@ -165,8 +177,10 @@ def check_console(process, log, timeout, slot=None):
         raise RuntimeError("A raiz do convidado precisa estar em SquashFS, montada somente para leitura.")
 
     if slot:
-        expected = [b"M1-VERSION=m1", f"M1-SLOT=rauc.slot={slot}".encode("ascii"),
+        expected = [b"M1-VERSION=pc" if pc else b"M1-VERSION=m1", f"M1-SLOT=rauc.slot={slot}".encode("ascii"),
                     b"M1-DOCUMENT=melkor-m1-persistencia"]
+        if pc:
+            expected.append(b"PC-SWAP=ok")
         if slot == "A":
             expected.append(b"M1-SYNC=ok")
         for field in expected:
@@ -186,11 +200,11 @@ def check_live_console(process, log, timeout, optical=False):
         console.send(f"live_media() {{ {media}; }}; {LIVE_PROBE}".encode("ascii"))
         live = console.expect(rb"^LIVE-END\r?$", "verificação do ambiente em RAM")
         console.send(LIVE_WIFI_PROBE.encode("ascii"))
-        wifi = console.expect(rb"^LIVE-WIFI-END\r?$", "verificação do firmware de Wi-Fi")
+        wifi = console.expect(rb"^LIVE-WIFI-END\r?$", "verificação de Wi-Fi")
     lines = system.splitlines() + live.splitlines() + wifi.splitlines()
     for field in (b"M0-ID=melkor", b"M0-PID1=dinit", b"M0-UEFI=yes", b"LIVE-VERSION=live", b"LIVE-USER=ok",
                   b"LIVE-DISPLAY=ok", b"LIVE-DEVICES=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-TOOLS=ok",
-                  b"LIVE-RAM=ok", b"LIVE-HOME=ok", b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok"):
+                  b"LIVE-RAM=ok", b"LIVE-HOME=ok", b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok", b"LIVE-IWD=ok"):
         if field not in lines:
             raise RuntimeError(f"Verificação da mídia live falhou: {field.decode('ascii')}.")
 
@@ -219,7 +233,10 @@ def run(args, report_dir, report):
     variables_copy = report_dir / "OVMF_VARS.fd"
     shutil.copyfile(variables, variables_copy)
     disk = image
-    if args.ab:
+    if args.pc:
+        disk = report_dir / "disk.img"
+        subprocess.run(["cp", "--reflink=auto", "--sparse=always", "--", image, disk], check=True)
+    elif args.ab:
         disk = report_dir / "disk.img"
         shutil.copyfile(image, disk)
 
@@ -239,7 +256,7 @@ def run(args, report_dir, report):
     media_options = "if=none,id=melkor"
     if optical:
         media_options += ",media=cdrom"
-    elif not args.ab:
+    elif not (args.ab or args.pc):
         media_options += ",readonly=on"
     command += ["-drive", drive(disk, media_options)]
     if args.live:
@@ -252,12 +269,14 @@ def run(args, report_dir, report):
             command += ["-device", "qemu-xhci,id=xhci", "-device", "usb-storage,bus=xhci.0,drive=melkor,bootindex=1"]
         command += ["-drive", drive(attached, "if=none,id=internal"),
                     "-device", "nvme,drive=internal,serial=melkor-teste"]
+    elif args.pc:
+        command += ["-device", "nvme,drive=melkor,serial=melkor-teste,bootindex=1"]
     else:
         command += ["-device", "virtio-blk-pci,drive=melkor,bootindex=1"]
 
     report.update(accel=accel, timeout_seconds=timeout, command=shlex.join(command),
                   ovmf_code_sha256=file_digest(code), ovmf_vars_sha256=file_digest(variables))
-    for slot in ("A", "B") if args.ab else (None,):
+    for slot in ("A", "B") if args.ab or args.pc else (None,):
         log_name = f"serial-{slot.lower()}.log" if slot else "serial.log"
         with (report_dir / log_name).open("wb") as log, subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
@@ -266,7 +285,7 @@ def run(args, report_dir, report):
                 if args.live:
                     check_live_console(process, log, timeout, optical)
                 else:
-                    check_console(process, log, timeout, slot)
+                    check_console(process, log, timeout, slot, pc=args.pc)
             finally:
                 if process.poll() is None:
                     process.kill()
@@ -285,6 +304,7 @@ def main():
     parser.add_argument("image", type=Path)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--ab", action="store_true", help="Inicia A e B e verifica o mesmo documento.")
+    mode.add_argument("--pc", action="store_true", help="Verifica A/B, dados e arquivo swap no disco PC.")
     mode.add_argument("--live", action="store_true", help="Inicia por USB ou CD UEFI e verifica o NVMe virtual.")
     parser.add_argument("--log-dir", type=Path, default=Path("out/boot-tests"))
     parser.add_argument("--ovmf-code", type=Path, default=os.environ.get("OVMF_CODE"))
@@ -303,7 +323,7 @@ def main():
     try:
         run(args, report_dir, report)
         report["exit_code"] = 0
-        if args.ab:
+        if args.ab or args.pc:
             print("Slots A e B iniciados via UEFI. Documento criado em A e reaberto em B.")
         elif args.live:
             print("Boot da mídia via UEFI, framebuffer, login em RAM e NVMe virtual intacto verificados.")

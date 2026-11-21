@@ -22,7 +22,7 @@ class BuildScriptsTest(unittest.TestCase):
         cls.scripts.mkdir(parents=True)
         for name in ("build-image.sh", "prepare-env.sh", "build-packages.fedora"):
             shutil.copy2(ROOT / "scripts" / name, cls.scripts)
-        shutil.copytree(ROOT / "core" / "board", cls.project / "core" / "board")
+        shutil.copytree(ROOT / "core" / "board", cls.project / "core" / "board", symlinks=True)
         cls.stub = cls.work / "tool_stub.py"
         shutil.copyfile(ROOT / "tests/tool_stub.py", cls.stub)
         cls.stub.chmod(0o755)
@@ -49,6 +49,20 @@ exec() { printf '%s\n' "$*" >> "$TEST_BOOT_LOG"; }
 install() { printf 'install %s\n' "$*" >> "$TEST_BOOT_LOG"; }
 mkdir() { printf 'mkdir %s\n' "$*" >> "$TEST_BOOT_LOG"; }
 ln() { printf 'ln %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+dbus-uuidgen() {
+    printf 'dbus-uuidgen %s\n' "$*" >> "$TEST_BOOT_LOG"
+    return "${TEST_DBUS_UUID_CODE:-0}"
+}
+mktemp() { printf '/tmp/melkor-simulado\n'; }
+fallocate() {
+    printf 'fallocate %s\n' "$*" >> "$TEST_BOOT_LOG"
+    return "${TEST_FALLOCATE_CODE:-0}"
+}
+mkswap() { printf 'mkswap %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+swapon() { printf 'swapon %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+mv() { printf 'mv %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+rm() { printf 'rm %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+dbus-run-session() { printf 'dbus-run-session %s %s %s\n' "$XDG_RUNTIME_DIR" "$LIBSEAT_BACKEND" "$*" >> "$TEST_BOOT_LOG"; }
 blkid() {
     case "$4" in
         PARTUUID=9327*) printf '/dev/vda1\n' ;;
@@ -221,6 +235,51 @@ source "$1"
         self.boot_log.write_text("")
         self.run_script(self.boot, init)
         self.assertEqual(self.boot_log.read_text().splitlines()[-1], "/sbin/dinit")
+
+    def test_dbus_live_prepara_identidade_antes_de_abrir_o_socket(self):
+        script = self.project / "core/board/live/rootfs-overlay/usr/libexec/melkor-system-bus"
+        self.run_script(self.boot, script, code=1, TEST_DBUS_UUID_CODE="1")
+        self.assertEqual(self.boot_log.read_text().splitlines(), [
+            "install -d -m 0755 /run/dbus", "dbus-uuidgen --ensure=/run/machine-id",
+        ])
+        self.boot_log.write_text("")
+        self.run_script(self.boot, script)
+        self.assertEqual(self.boot_log.read_text().splitlines()[-1],
+                         "dbus-daemon --system --nofork --nopidfile --print-address=4")
+
+    def test_pc_monta_dados_e_esp_do_disco_resolvido(self):
+        root = self.project / "core/board/pc/rootfs-overlay/usr/libexec"
+        self.run_script(self.boot, root / "melkor-pc-persist", code=1, TEST_MOUNT_CODE="1")
+        self.assertNotIn("bind", self.boot_log.read_text())
+        self.boot_log.write_text("")
+        self.run_script(self.boot, root / "melkor-pc-persist")
+        self.run_script(self.boot, root / "melkor-rauc-setup")
+        log = self.boot_log.read_text()
+        self.assertIn("/run/melkor/data /persist", log)
+        self.assertIn("mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp", log)
+        self.assertIn("/persist/melkor /home/melkor", log)
+        self.assertIn("install -d -m 0700 -o root -g root /persist/iwd", log)
+        self.assertIn("/run/melkor/esp-device /run/melkor/esp", log)
+
+    def test_pc_aloca_e_publica_swap_antes_de_ativar(self):
+        file = self.project / "core/board/pc/rootfs-overlay/usr/libexec/melkor-pc-swap"
+        self.run_script(self.boot, file, code=1, TEST_FALLOCATE_CODE="1")
+        self.assertNotIn("swapon", self.boot_log.read_text())
+        self.assertIn("rm -f -- /tmp/melkor-simulado", self.boot_log.read_text())
+        self.boot_log.write_text("")
+        self.run_script(self.boot, file)
+        self.assertEqual(self.boot_log.read_text().splitlines()[1:5], [
+            "fallocate -l 4G /tmp/melkor-simulado", "mkswap /tmp/melkor-simulado",
+            "mv -T /tmp/melkor-simulado /persist/.swap/swapfile", "swapon /persist/.swap/swapfile",
+        ])
+
+    def test_pc_inicia_uma_sessao_wayland_com_runtime_privado(self):
+        file = self.project / "core/board/pc/rootfs-overlay/usr/bin/melkor-desktop"
+        self.run_script(self.boot, file)
+        self.assertEqual(self.boot_log.read_text().splitlines(), [
+            "dbus-run-session /tmp/melkor-simulado seatd -- weston --renderer=pixman",
+            "rm -rf -- /tmp/melkor-simulado",
+        ])
 
     def test_rauc_monta_so_dispositivos_inequivocos(self):
         setup = self.project / "core/board/m1/rootfs-overlay/usr/libexec/melkor-rauc-setup"
