@@ -2,6 +2,19 @@
 
 Este documento define o perfil de instalação para os PCs pessoais do William. O instalador de disco real pertence ao M4. A integração do leitor de digitais e dos navegadores depende da sessão Wayland do M2 e do perfil de aplicativos do M3.
 
+## Teste de hardware pelo pendrive
+
+Use a imagem Melkor Live em um pendrive descartável. O sistema carrega o kernel e a raiz em RAM e perde os arquivos feitos durante a sessão ao desligar. Ele enumera os dispositivos sem montar os discos. Esta etapa identifica quais drivers o notebook precisa para a futura instalação.
+
+1. Confira os arquivos baixados com `sha256sum -c SHA256SUMS` no diretório do download. Descompacte o arquivo `.img.gz` com `gzip -dk arquivo.img.gz`.
+2. No aplicativo Discos do GNOME, selecione o **pendrive** pelo modelo e capacidade e use **Restaurar imagem de disco…** para gravar o `.img`. A gravação substitui todo o conteúdo do pendrive. [Gravação de imagem com Discos do GNOME](https://gnome.pages.gitlab.gnome.org/gnome-build-meta/docs/install.html)
+3. No HP ProBook x360 435 G7, ligue o notebook, pressione `Esc` e depois `F9` e escolha a entrada UEFI do pendrive. O GRUB desta mídia é sem assinatura e requer Secure Boot desativado. Se usar Windows com BitLocker, tenha acesso à chave de recuperação antes de alterar a configuração do firmware. Preserve o modo UEFI e restaure a configuração anterior depois do teste. [Secure Boot no HP](https://support.hp.com/in-en/document/ish_6930187-6931079-16) · [Recuperação do BitLocker](https://learn.microsoft.com/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview)
+4. Selecione **Melkor Linux - diagnostico em RAM**. No console local, entre com `melkor` como usuário e senha. O comando `id` deve indicar UID 1000 e o comando `cat /proc/mounts` mostra a raiz em memória.
+5. Execute `ls /sys/block`, `lspci`, `lsusb` e `/usr/sbin/iw dev`. Confira se aparecem o SSD, a GPU, a placa de rede e o leitor de digitais. Registre o ID USB do leitor no formato `vvvv:pppp`, que determina o suporte pelo libfprint.
+6. Fotografe ou anote as saídas relevantes e encerre a sessão. Desligue pelo botão de energia, mantendo-o pressionado se necessário, e remova o pendrive para voltar ao sistema habitual.
+
+Nesta mídia, a verificação de vídeo usa o framebuffer do firmware e o Wi-Fi se limita à detecção da interface. A autenticação por digital, a conexão Wi-Fi, os testes de suspensão e a sessão gráfica fazem parte das próximas validações no notebook.
+
 ## Decisões
 
 | Área | Padrão |

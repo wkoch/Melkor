@@ -8,8 +8,9 @@ buildroot_remote=https://gitlab.com/buildroot.org/buildroot.git
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 board=${2:-m0}
 case "$board" in
-    m0|m1) ;;
-    *) echo "Alvo desconhecido: $board. Use BOARD=m0 ou BOARD=m1." >&2; exit 2 ;;
+    m0|m1) rootfs_option=BR2_TARGET_ROOTFS_SQUASHFS ;;
+    live) rootfs_option=BR2_TARGET_ROOTFS_CPIO_GZIP ;;
+    *) echo "Alvo desconhecido: $board. Use BOARD=m0, BOARD=m1 ou BOARD=live." >&2; exit 2 ;;
 esac
 output=$(realpath -m -- "${1:-out/$board}")
 cache="$project/out/dl"
@@ -51,7 +52,7 @@ git -C "$source" -c advice.detachedHead=false checkout -q --detach "$buildroot_c
 buildroot_make=(make --no-print-directory -C "$source" "O=$build" "BR2_EXTERNAL=$project/core" "BR2_DL_DIR=$cache")
 "${buildroot_make[@]}" "melkor_${board}_defconfig"
 for option in BR2_TOOLCHAIN_BUILDROOT_MUSL BR2_GCC_VERSION_14_X BR2_INIT_NONE \
-    BR2_PACKAGE_DINIT BR2_TARGET_GRUB2_X86_64_EFI BR2_TARGET_ROOTFS_SQUASHFS \
+    BR2_PACKAGE_DINIT BR2_TARGET_GRUB2_X86_64_EFI "$rootfs_option" \
     BR2_DOWNLOAD_FORCE_CHECK_HASHES; do
     if ! grep -Fxq "$option=y" "$build/.config"; then
         echo "O Buildroot não ativou $option." >&2

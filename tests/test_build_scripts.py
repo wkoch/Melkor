@@ -45,6 +45,7 @@ source "$script" "$@"
     return "${TEST_MOUNT_CODE:-0}"
 }
 hostname() { printf 'hostname %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+exec() { printf '%s\n' "$*" >> "$TEST_BOOT_LOG"; }
 install() { printf 'install %s\n' "$*" >> "$TEST_BOOT_LOG"; }
 mkdir() { printf 'mkdir %s\n' "$*" >> "$TEST_BOOT_LOG"; }
 ln() { printf 'ln %s\n' "$*" >> "$TEST_BOOT_LOG"; }
@@ -99,9 +100,9 @@ source "$1"
     def commands(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
 
-    def test_build_m0_e_m1_geram_evidencias(self):
+    def test_build_gera_evidencias_para_cada_alvo(self):
         for board, source in (("m0", "https://example.invalid/buildroot.git"),
-                              ("m1", str(self.bundle))):
+                              ("m1", str(self.bundle)), ("live", str(self.bundle))):
             with self.subTest(board=board):
                 override = {"MELKOR_BUILDROOT_URL": source} if board == "m0" else {}
                 if not override:
@@ -184,6 +185,10 @@ source "$1"
         self.run_script(board / "m0/post-image.sh", **env)
         self.run_script(board / "m1/post-image.sh", code=5, TEST_GENIMAGE_CODE="5", **env)
         self.run_script(board / "m1/post-image.sh", **env)
+        self.run_script(board / "live/post-image.sh", code=1, **env)
+        (binaries / "rootfs.cpio.gz").write_text("initramfs")
+        self.run_script(board / "live/post-image.sh", code=5, TEST_GENIMAGE_CODE="5", **env)
+        self.run_script(board / "live/post-image.sh", **env)
         target = build / "target"
         self.run_script(board / "m1/post-build.sh", target, **env)
         self.assertEqual((target / "boot/bzImage").read_text(), "kernel")
@@ -206,6 +211,14 @@ source "$1"
             hash_file.write_text(invalid + "\n")
             self.run_script(board / "m1/post-build.sh", target, code=1, MELKOR_LAB_ROOT_HASH_FILE=hash_file, **env)
         self.assertIn(password_hash, shadow.read_text())
+
+    def test_init_live_exige_devs_em_memoria_antes_de_iniciar_dinit(self):
+        init = self.project / "core/board/live/rootfs-overlay/init"
+        self.run_script(self.boot, init, code=1, TEST_MOUNT_CODE="1")
+        self.assertEqual(self.boot_log.read_text().splitlines(), ["mount -t devtmpfs -o nosuid,mode=0755 devtmpfs /dev"])
+        self.boot_log.write_text("")
+        self.run_script(self.boot, init)
+        self.assertEqual(self.boot_log.read_text().splitlines()[-1], "/sbin/dinit")
 
     def test_rauc_monta_so_dispositivos_inequivocos(self):
         setup = self.project / "core/board/m1/rootfs-overlay/usr/libexec/melkor-rauc-setup"

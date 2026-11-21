@@ -1,0 +1,3 @@
+type = internal
+depends-on = console-local
+waits-for = serial-console

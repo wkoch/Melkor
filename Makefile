@@ -21,7 +21,7 @@ image:
 	$(BUILD_ENV) env MELKOR_RAUC_KEYRING="$(MELKOR_RAUC_KEYRING)" MELKOR_LAB_ROOT_HASH_FILE="$(MELKOR_LAB_ROOT_HASH_FILE)" ./scripts/build-image.sh "$(OUT)" "$(BOARD)"
 
 test-boot:
-	$(BUILD_ENV) python3 scripts/test-boot.py "$(OUT)/build/images/melkor-$(BOARD).img" --log-dir "$(OUT)/tests" $(if $(filter m1,$(BOARD)),--ab)
+	$(BUILD_ENV) python3 scripts/test-boot.py "$(OUT)/build/images/melkor-$(BOARD).img" --log-dir "$(OUT)/tests" $(if $(filter m1,$(BOARD)),--ab) $(if $(filter live,$(BOARD)),--live)
 
 check-m1: BOARD = m1
 check-m1:

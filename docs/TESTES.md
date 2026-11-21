@@ -21,6 +21,7 @@ Em 20 de novembro de 2026, `make test` passou no Bazzite com 85,9% em Go, 95,0% 
 | Caso | Ação | Resultado observável |
 | --- | --- | --- |
 | Boot mínimo | Iniciar pelo disco, aguardar login serial e consultar o convidado. | Identidade Melkor, dinit como PID 1 e rootfs somente para leitura. Timeout ou atributo incorreto gera falha. |
+| Mídia de diagnóstico | Iniciar pelo USB UEFI virtual ao lado de um NVMe virtual gravável. | Login comum, framebuffer e raiz em RAM. O NVMe aparece sem ser montado e o hash integral do disco permanece igual. |
 | Atualização válida | Partir de A, criar documento persistente, aplicar imagem B assinada e reiniciar. | B inicia, passa a verificação de saúde, confirma o slot e mantém o documento. |
 | Imagem inválida | Apresentar imagem adulterada ou de alvo incompatível. | A candidata é rejeitada antes da ativação. O slot inicializável anterior continua selecionável. |
 | Interrupção | Desligar a VM durante a gravação de B, antes da ativação. Ligar com o mesmo disco e estado UEFI. | A inicia por conta própria. Documento e perfil ainda são utilizáveis. Uma nova tentativa consegue aplicar a atualização. |
@@ -52,6 +53,12 @@ python3 scripts/test-boot.py "$cenario/disco-vazio.img" \
 ```
 
 O processo deve terminar com código `1`. Em `result.json`, verifique a mensagem de timeout ao aguardar o prompt de login. A saída que o firmware enviar ao console fica em `serial.log`.
+
+## Boot da mídia de diagnóstico
+
+Execute `make check-env BOARD=live`, `make image BOARD=live OUT=out/live-hp` e `make test-boot BOARD=live OUT=out/live-hp`. O teste usa QEMU, OVMF, `sfdisk` e `mke2fs` para simular um pendrive protegido contra gravação e um NVMe gravável com GPT e um volume ext4 válido. Ambos são arquivos locais e nenhum periférico físico é repassado à VM. A sessão valida a raiz em RAM, o framebuffer, a enumeração dos dois dispositivos, as permissões do usuário comum e a escrita no home volátil. O executor calcula o hash do NVMe antes e depois da sessão. `QEMU_ACCEL=tcg` exercita o mesmo cenário sem KVM.
+
+Depois da validação virtual, use a mídia no notebook para conferir o console com tela e teclado locais e obter os IDs dos componentes. [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 
 ## Protótipo A/B do M1
 

@@ -43,6 +43,18 @@ WRITE_DOCUMENT = (
     'printf "melkor-m1-persistencia\\n" > "$HOME/.melkor-m1-probe" && sync '
     '&& printf "\\nM1-SYNC=ok\\n"; '
 )
+LIVE_PROBE = (
+    '. /etc/os-release; printf "\\nLIVE-VERSION=%s\\n" "$VERSION_ID"; '
+    '[ "$(id -u)" -eq 1000 ] && printf "LIVE-USER=ok\\n"; '
+    '[ -d /sys/class/graphics/fb0 ] && printf "LIVE-DISPLAY=ok\\n"; '
+    '[ -b /dev/sda ] && [ -b /dev/nvme0n1p1 ] && printf "LIVE-DEVICES=ok\\n"; '
+    '[ ! -w /dev/sda ] && [ ! -w /dev/nvme0n1 ] && printf "LIVE-PERMISSIONS=ok\\n"; '
+    'lspci >/dev/null && lsusb >/dev/null && /usr/sbin/iw dev >/dev/null && printf "LIVE-TOOLS=ok\\n"; '
+    'awk \'$2 == "/" && $3 ~ /^(rootfs|ramfs|tmpfs)$/ {ram=1} '
+    '$1 ~ /^\\/dev\\// {disk=1} END {if (ram && !disk) print "LIVE-RAM=ok"}\' /proc/mounts; '
+    'printf "ram\\n" > "$HOME/.melkor-live-probe" && printf "LIVE-HOME=ok\\n"; '
+    'printf "LIVE-END\\n"'
+)
 
 
 def file_digest(path):
@@ -156,6 +168,29 @@ def check_console(process, log, timeout, slot=None):
             raise RuntimeError("A partição ext4 de dados precisa estar montada para escrita.")
 
 
+def check_live_console(process, log, timeout):
+    with serial_console(process, log, timeout) as console:
+        login(console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
+        console.send((PROBE + "; " + LIVE_PROBE).encode("ascii"))
+        lines = console.expect(rb"^LIVE-END\r?$", "verificação do ambiente em RAM").splitlines()
+    for field in (b"M0-ID=melkor", b"M0-PID1=dinit", b"M0-UEFI=yes", b"LIVE-VERSION=live", b"LIVE-USER=ok",
+                  b"LIVE-DISPLAY=ok", b"LIVE-DEVICES=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-TOOLS=ok",
+                  b"LIVE-RAM=ok", b"LIVE-HOME=ok"):
+        if field not in lines:
+            raise RuntimeError(f"Verificação da mídia live falhou: {field.decode('ascii')}.")
+
+
+def create_live_test_disk(path):
+    with path.open("xb") as disk:
+        disk.truncate(64 << 20)
+    # Um volume ext4 válido exercita o risco de uma montagem automática acidental.
+    subprocess.run(["sfdisk", "--no-reread", "--no-tell-kernel", path],
+                   input="label: gpt\nstart=2048, size=65536, type=L\n", text=True, check=True,
+                   stdout=subprocess.DEVNULL)
+    subprocess.run(["mke2fs", "-q", "-F", "-t", "ext4", "-L", "melkor-data", "-b", "4096",
+                    "-E", "offset=1048576", path, "8192"], check=True)
+
+
 def run(args, report_dir, report):
     image = args.image.resolve()
     if not image.is_file():
@@ -185,8 +220,16 @@ def run(args, report_dir, report):
                "-serial", "stdio", "-monitor", "none", "-nic", "none", "-no-reboot",
                "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
                "-drive", drive(variables_copy, "if=pflash,unit=1"),
-               "-drive", drive(disk, "if=none,id=melkor" if args.ab else "if=none,id=melkor,readonly=on"),
-               "-device", "virtio-blk-pci,drive=melkor,bootindex=1"]
+               "-drive", drive(disk, "if=none,id=melkor" if args.ab else "if=none,id=melkor,readonly=on")]
+    if args.live:
+        attached = report_dir / "internal-nvme.img"
+        create_live_test_disk(attached)
+        report["internal_sha256_before"] = file_digest(attached)
+        command += ["-device", "qemu-xhci,id=xhci", "-device", "usb-storage,bus=xhci.0,drive=melkor,bootindex=1",
+                    "-drive", drive(attached, "if=none,id=internal"),
+                    "-device", "nvme,drive=internal,serial=melkor-teste"]
+    else:
+        command += ["-device", "virtio-blk-pci,drive=melkor,bootindex=1"]
 
     report.update(accel=accel, timeout_seconds=timeout, command=shlex.join(command),
                   ovmf_code_sha256=file_digest(code), ovmf_vars_sha256=file_digest(variables))
@@ -196,20 +239,29 @@ def run(args, report_dir, report):
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         ) as process:
             try:
-                check_console(process, log, timeout, slot)
+                if args.live:
+                    check_live_console(process, log, timeout)
+                else:
+                    check_console(process, log, timeout, slot)
             finally:
                 if process.poll() is None:
                     process.kill()
                 log.write(process.stdout.read())
         if slot:
             report.setdefault("verified_slots", []).append(slot)
+    if args.live:
+        report["internal_sha256_after"] = file_digest(attached)
+        if report["internal_sha256_before"] != report["internal_sha256_after"]:
+            raise RuntimeError("O disco NVMe virtual foi alterado durante o boot live.")
 
 
 def main():
     version = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], capture_output=True, text=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
-    parser.add_argument("--ab", action="store_true", help="Inicia A e B e verifica o mesmo documento.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--ab", action="store_true", help="Inicia A e B e verifica o mesmo documento.")
+    mode.add_argument("--live", action="store_true", help="Inicia por USB e verifica o NVMe virtual.")
     parser.add_argument("--log-dir", type=Path, default=Path("out/boot-tests"))
     parser.add_argument("--ovmf-code", type=Path, default=os.environ.get("OVMF_CODE"))
     parser.add_argument("--ovmf-vars", type=Path, default=os.environ.get("OVMF_VARS"))
@@ -229,9 +281,11 @@ def main():
         report["exit_code"] = 0
         if args.ab:
             print("Slots A e B iniciados via UEFI. Documento criado em A e reaberto em B.")
+        elif args.live:
+            print("Boot USB via UEFI, framebuffer, login em RAM e NVMe virtual intacto verificados.")
         else:
             print("Login serial UEFI, identidade Melkor, dinit como PID 1 e raiz somente para leitura verificados.")
-    except (OSError, RuntimeError) as error:
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         report["error"] = str(error)
         print(error, file=sys.stderr)
     finally:

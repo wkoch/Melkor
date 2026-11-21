@@ -8,6 +8,8 @@ O marco M0 entrega uma imagem x86-64 que inicia por UEFI e chega ao console seri
 
 Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot serial. A prévia inclui dinit, slots A/B, armazenamento persistente e DNS do sistema via Quad9 DoH. A release também oferece o CLI de aplicativos para o host Linux x86-64. A instalação em computador físico faz parte do M4. [Melkor v0.1.0-alpha.1](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
 
+Para conferir o HP ProBook x360 435 G7, use a mídia **Melkor Live**. Ela inicia pelo pendrive, roda em RAM e abre um console local para conferir tela, teclado e a detecção de dispositivos. [Teste de hardware pelo pendrive](docs/INSTALACAO.md#teste-de-hardware-pelo-pendrive)
+
 ## A experiência pretendida
 
 - **Alterar o core.** Editar a receita, recompilar o conjunto completo a partir das fontes e testar a imagem. Ativar a imagem como uma nova geração, mantendo a anterior inicializável.
@@ -52,6 +54,8 @@ O host Bazzite é imutável e não tem `sudo` sem senha. As ferramentas de build
 | `make image BOARD=m1` | `make env BOARD=m1` e `mke2fs` do e2fsprogs | Gera o disco de laboratório com slots A/B e dados em ext4. Informe o PEM dos certificados públicos em `MELKOR_RAUC_KEYRING` para habilitar atualizações assinadas. |
 | `make check-m1` | Imagem M1, Python 3.11 ou posterior e `sfdisk` e `blkid` do util-linux | Lê a tabela GPT e verifica os arquivos de boot, atualização e DNS dos slots. |
 | `make test-boot BOARD=m1` | Imagem M1, QEMU e OVMF | Inicia A, grava um documento e o lê após selecionar B, usando a mesma cópia do disco. |
+| `make env BOARD=live` e `make image BOARD=live` | Ambiente Buildroot, rede para preparar o cache inicial e saída nova | Verifica as fontes e constrói `melkor-live.img`, mídia UEFI x86-64 que carrega o sistema em RAM. |
+| `make test-boot BOARD=live` | Imagem Live, QEMU, OVMF, `sfdisk` e `mke2fs` | Inicia pelo USB virtual e confere o login, o framebuffer e a integridade do NVMe virtual. |
 | `make test-dns OUT=out/m1-doh` | Imagem M1, QEMU, OVMF, `tcpdump` e acesso HTTPS ao Quad9 | Confirma DoH pelo resolvedor da VM e inspeciona o tráfego com e sem acesso à internet. Use `DNS_IPV6_ONLY=1` em um host com acesso IPv6. |
 | `make bundle-m1 OUT=out/m1-rauc CERT=… KEY=… KEYRING=… VERSION=1.0` | Build do M1, certificado de assinatura, chave privada e chaveiro público confiável pela imagem | Usa o RAUC do build para gerar `OUT/melkor-m1-1.0.raucb` a partir do SquashFS. |
 | `make test-update OUT=out/m1-rauc CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Imagem M1 com certificado e credencial descartáveis, Python 3.11+, QEMU, OVMF, `mke2fs` e `sfdisk` | Testa instalação, rejeições, confirmação e recuperação do core em cópias do disco. [Procedimento de laboratório](docs/TESTES.md#bundles-assinados-e-recuperação-m1) |

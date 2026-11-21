@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+mount -t devtmpfs -o nosuid,mode=0755 devtmpfs /dev
+exec /sbin/dinit

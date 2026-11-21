@@ -1,0 +1,4 @@
+type = process
+depends-on = setup
+command = /sbin/getty 38400 tty1 linux
+restart = true

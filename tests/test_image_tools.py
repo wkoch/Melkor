@@ -28,6 +28,8 @@ bundle = script("bundle-m1")
 LOGIN = b"\rmelkor login: \n\rPassword: \nmelkor$ \n"
 PROBE = b"M0-ID=melkor\nM0-PID1=dinit\nM0-LOGIN=melkor\nM0-UEFI=yes\nM0-ROOT=squashfs,ro\nM0-END\n"
 MENU = b"Melkor Linux M1 - slot B\nPress enter to boot the selected OS\n*Melkor Linux M1 - slot A\n"
+LIVE = (b"LIVE-VERSION=live\nLIVE-USER=ok\nLIVE-DISPLAY=ok\nLIVE-DEVICES=ok\n"
+        b"LIVE-PERMISSIONS=ok\nLIVE-TOOLS=ok\nLIVE-RAM=ok\nLIVE-HOME=ok\nLIVE-END\n")
 
 
 class BundleTest(unittest.TestCase):
@@ -104,6 +106,15 @@ def console(data, keep_open=False):
 
 
 class SerialTest(unittest.TestCase):
+    def test_live_exige_ram_sem_disco_montado_e_usuario_comum(self):
+        with console(LOGIN + PROBE + LIVE) as process:
+            boot.check_live_console(process, io.BytesIO(), timeout=1)
+            self.assertIn(boot.LIVE_PROBE.encode(), process.stdin.getvalue())
+        for field in (b"LIVE-RAM=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-USER=ok"):
+            with self.subTest(field=field), console(LOGIN + PROBE + LIVE.replace(field, b"")) as process:
+                with self.assertRaisesRegex(RuntimeError, field.decode()):
+                    boot.check_live_console(process, io.BytesIO(), timeout=1)
+
     def test_boot_m0(self):
         with console(LOGIN + PROBE) as process:
             log = io.BytesIO()
@@ -172,7 +183,7 @@ class BootRunnerTest(unittest.TestCase):
         for file in (self.code, self.variables, self.disk):
             file.write_bytes(file.name.encode())
         self.args = argparse.Namespace(
-            image=self.disk, ovmf_code=self.code, ovmf_vars=self.variables, ab=False,
+            image=self.disk, ovmf_code=self.code, ovmf_vars=self.variables, ab=False, live=False,
             accel="auto", timeout=None,
         )
 
@@ -192,6 +203,34 @@ class BootRunnerTest(unittest.TestCase):
 
     def test_m1_reutiliza_copia_gravavel_e_variaveis_nos_dois_slots(self):
         self.check_run(ab=True)
+
+    def test_live_inicia_por_usb_e_confere_hash_do_nvme(self):
+        self.args.live = True
+        attached = self.path / "internal-nvme.img"
+
+        def alter_disk(*args):
+            with attached.open("r+b") as disk:
+                disk.write(b"alterado")
+
+        for check_disk, changed in ((None, False), (alter_disk, True)):
+            with self.subTest(altered=changed), patch.dict(os.environ, {"QEMU_SYSTEM": "/test/qemu"}), \
+                 patch.object(boot.subprocess, "Popen") as spawn, patch.object(boot.subprocess, "run") as setup_disk, \
+                 patch.object(boot, "check_live_console", side_effect=check_disk):
+                spawn.return_value.__enter__.return_value.stdout.read.return_value = b"final"
+                report = {}
+                if changed:
+                    with self.assertRaisesRegex(RuntimeError, "disco NVMe virtual foi alterado"):
+                        boot.run(self.args, self.path, report)
+                else:
+                    boot.run(self.args, self.path, report)
+                    self.assertEqual(report["internal_sha256_before"], report["internal_sha256_after"])
+                command = spawn.call_args.args[0]
+                self.assertIn("usb-storage,bus=xhci.0,drive=melkor,bootindex=1", command)
+                self.assertIn("nvme,drive=internal,serial=melkor-teste", command)
+                self.assertTrue(any("id=melkor,readonly=on" in value for value in command))
+                self.assertEqual([call.args[0][0] for call in setup_disk.call_args_list], ["sfdisk", "mke2fs"])
+                self.assertTrue(all(attached in call.args[0] for call in setup_disk.call_args_list))
+                attached.unlink()
 
     def check_run(self, ab):
         self.args.ab = ab

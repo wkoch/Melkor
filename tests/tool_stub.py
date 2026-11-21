@@ -24,7 +24,8 @@ elif tool == "make":
         build.mkdir(parents=True, exist_ok=True)
         options = [
             "BR2_TOOLCHAIN_BUILDROOT_MUSL", "BR2_GCC_VERSION_14_X", "BR2_INIT_NONE",
-            "BR2_PACKAGE_DINIT", "BR2_TARGET_GRUB2_X86_64_EFI", "BR2_TARGET_ROOTFS_SQUASHFS",
+            "BR2_PACKAGE_DINIT", "BR2_TARGET_GRUB2_X86_64_EFI",
+            "BR2_TARGET_ROOTFS_CPIO_GZIP" if args[-1] == "melkor_live_defconfig" else "BR2_TARGET_ROOTFS_SQUASHFS",
             "BR2_DOWNLOAD_FORCE_CHECK_HASHES",
         ]
         (build / ".config").write_text("".join(f"{name}=y\n" for name in options
@@ -64,13 +65,17 @@ elif tool == "genimage":
     stage = Path(args[args.index("--inputpath") + 1])
     assert (stage / "EFI/BOOT/grub.cfg").is_file()
     assert (stage / "EFI/BOOT/bootx64.efi").read_text() == "EFI"
-    assert (stage / "rootfs.squashfs").read_text() == "rootfs"
-    if (stage / "persist.ext4").exists():
+    if args[-1].endswith("/live/genimage.cfg"):
+        assert (stage / "rootfs.cpio.gz").read_text() == "initramfs"
+        assert (stage / "bzImage").read_text() == "kernel"
+    elif (stage / "persist.ext4").exists():
+        assert (stage / "rootfs.squashfs").read_text() == "rootfs"
         assert (stage / "persist.ext4").stat().st_size == 128 << 20
         assert (stage / "EFI/BOOT/grubenv").read_text().splitlines() == [
             "ORDER=A B", "A_OK=1", "A_TRY=0", "B_OK=0", "B_TRY=0",
         ]
     else:
+        assert (stage / "rootfs.squashfs").read_text() == "rootfs"
         assert (stage / "bzImage").read_text() == "kernel"
     sys.exit(int(os.environ.get("TEST_GENIMAGE_CODE", "0")))
 elif tool == "grub-editenv":

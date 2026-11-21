@@ -46,6 +46,12 @@ O `dnsproxy` 0.86.0 roda com a conta dedicada `melkor-dns`. `setpriv`, do util-l
 
 O core inclui `ca-certificates` 20260816+nmu1 e `libcap-ng` 0.8.5 das receitas do Buildroot. Python 3.12.16 é uma dependência do host para montar o conjunto de certificados. O `tcpdump` do Fedora é usado no ambiente de testes para ler as capturas do QEMU.
 
+### Mídia de diagnóstico em RAM
+
+O alvo `live` gera uma imagem GPT com uma única ESP. O GRUB carrega dali o kernel e um initramfs comprimido. O dinit abre o login em `tty1` e no primeiro console serial. O sistema monta apenas os sistemas de arquivos virtuais necessários para o console e mantém o home em RAM. Root permanece bloqueado e a mídia não inicia serviços para obter conectividade. O kernel disponibiliza framebuffer EFI, armazenamento USB e NVMe, AHCI e HID para sondar os dispositivos.
+
+As receitas do Buildroot fixado fornecem `iw` 6.9 e `libnl` 3.11.0 para a enumeração das interfaces. `linux-firmware` 20250211 entra na mídia com a seleção `22260` para o Intel AX200 e os arquivos `rtw88` para placas Realtek. O Buildroot verifica os hashes das fontes. O kernel e os utilitários do Live entram apenas nessa mídia. [Receitas no Buildroot fixado](https://gitlab.com/buildroot.org/buildroot/-/tree/2025.02.20/package) · [Opções Intel na família HP](https://jp.ext.hp.com/notebooks/business/probook_x360_435_g7/) · [Suporte Realtek listado pela HP](https://support.hp.com/soar-attachment/977/col94858-ob-276296-1-ob-276296-1_sp121426_releasedoc.html)
+
 ## Política de dependências
 
 | Camada | Política |

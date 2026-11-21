@@ -1,0 +1,6 @@
+Melkor Linux Live. Esta sessão roda em RAM e perde os arquivos ao desligar.
+
+  ls /sys/block     Discos detectados
+  lspci             Dispositivos PCI, incluindo vídeo e rede
+  lsusb             Dispositivos USB, incluindo leitor de digitais
+  /usr/sbin/iw dev  Interfaces de Wi-Fi detectadas
