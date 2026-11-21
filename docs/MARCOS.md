@@ -142,7 +142,7 @@ Aplicar os [padrões da primeira instalação](INSTALACAO.md) e demonstrar disco
 
 ### Prévia de diagnóstico para o notebook
 
-O primeiro teste físico usa a ISO `v0.1.0-alpha.2` pelo Ventoy. O boot abre um console local sem montar o SSD. A instalação em disco inteiro, o provisionamento de contas e swap e os testes dos drivers na unidade do William são etapas pendentes. [Release Live](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.2) · [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
+O primeiro teste físico usou a ISO `v0.1.0-alpha.2` pelo Ventoy. A mídia abre um console local sem montar o SSD. A instalação em disco inteiro e o provisionamento de contas e swap são etapas pendentes. [Release Live](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.2) · [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 
 | Comando ou cenário | Pré-requisito e resultado |
 | --- | --- |
@@ -159,7 +159,7 @@ O SHA-256 da ISO é `3a855577a11f6f4418a24f9cc9a6863b136db8ab4a80975ab2d4fcd0800
 
 A alpha.2 iniciou pelo Ventoy no HP ProBook x360 435 G7, com teclado e vídeo, e detectou o SSD NVMe e o leitor Synaptics `06cb:00df`. No Fedora Atomic COSMIC da mesma unidade, a Intel AX200 (`8086:2723`) registrou `wlp1s0` via `iwlwifi` e se associou em 5 GHz. No Live, o driver solicitou `iwlwifi-cc-a0-77.ucode` e recebeu `-ENOENT`. A extração da ISO e o console do QEMU confirmaram o arquivo no initramfs. A origem da falha de busca no boot físico ainda não foi isolada. O mesmo log registrou `pci_enable_msi failed -38` e `failed to load regulatory.db`.
 
-A alpha.3 embute o firmware no kernel, habilita PCI MSI e inclui a base regulatória assinada do `cfg80211`. O próximo teste no notebook volta a consultar `/usr/sbin/iw dev`. [Release Live](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.3)
+A alpha.3 embute o firmware no kernel, habilita PCI MSI e inclui a base regulatória assinada do `cfg80211`. No novo boot do HP, `/usr/sbin/iw dev` listou a interface `wlan0` em `phy#0`, no modo `managed`. Isso confirma a inicialização da AX200 no Melkor Live. Associação a uma rede, obtenção de endereço e consultas Quad9 via DoH pelo Wi-Fi ainda precisam de teste no notebook. [Release Live](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.3)
 
 | Comando ou cenário | Resultado |
 | --- | --- |
