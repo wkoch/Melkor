@@ -132,7 +132,7 @@ O [procedimento de importação](TESTES.md#provas-de-importação-isolada) regis
 | `make test-packages OUT=out/importacao-m3.gtMyaJ/retorno …` | O DEB removido voltou a executar após reativar a geração anterior e leu o dado gravado. Foi possível selecionar de novo a geração mais recente sem o DEB. Evidências em `out/importacao-m3.gtMyaJ/retorno/package-tests/pacotes-1pwwcq44/`. |
 | `make test` | Rejeições de manifestos, caminhos, arquivos e imagens ausentes preservaram a geração ativa. Cobertura de 86,7% em Go, 95,7% em Python e 96,0% em Shell. Relatórios em `out/coverage/test-45esy_dp/`. |
 
-O catálogo separado passou pelo teste local de proposta, aceite, sincronização de tag SSH assinada e instalação em um segundo perfil sem IA. O primeiro PR real foi aberto pelo CLI e passou na CI do repositório privado. A primeira versão assinada do catálogo aguarda a revisão do PR. [Testes do catálogo](TESTES.md#publicação-e-consumo-de-receitas) · [PR #1](https://github.com/wkoch/Melkor-Recipes/pull/1)
+O catálogo separado passou pelo teste local de proposta, aceite, sincronização de tag SSH assinada e instalação em um segundo perfil sem IA. O primeiro PR real foi aberto pelo CLI, passou na CI e foi integrado. A tag assinada `v0.1.0` aponta para o merge `0e936c1`. A sincronização por HTTPS ativou a receita do Nushell em um perfil descartável com a chave pública fixada em `catalogo/allowed_signers`. [Testes do catálogo](TESTES.md#publicação-e-consumo-de-receitas) · [PR #1](https://github.com/wkoch/Melkor-Recipes/pull/1)
 
 ## M4 — Instalar e usar no computador
 
@@ -232,3 +232,9 @@ O executor `tests/pc_desktop_vm.py --apps --chromium --umbriel` iniciou a sessã
 `make installer-iso OUT=out/pc-desktop-next/ventoy-ready PC_OUT=out/pc-desktop-next/core` gerou a ISO de 951 MiB com SHA-256 `91ff6077fac4f03280ff78f9222f09c191d642365c14b721c724e14e7d921fcb`. O teste `make test-installer TEST_VM_MEMORY=8192` e a variante `tests/installer_vm.py --ventoy-drive` usaram a mesma ISO, com QEMU, OVMF, TCG e setores lógicos de 512 bytes. A mídia inicializou por CD UEFI e pelo modo normal do Ventoy. Nos dois casos a instalação confirmou A e B, e os hashes do NVMe vizinho conferiram. Relatórios em `out/pc-desktop-next/ventoy-ready/tests/`.
 
 `make test` passou com 49 testes Python e cobertura de 80,1% em Go, 92,0% em Python e 97,0% em Shell. O teste de áudio no HP, os portais de arquivos, o desbloqueio no Noctalia e a biometria continuam pendentes.
+
+### Candidata do PC com as chaves oficiais
+
+O Buildroot recompôs o core de revisão 1 com a toolchain PC já validada e as três camadas de aplicativos. Os arquivos públicos do RAUC e do canal Ed25519 foram comparados com os PEM extraídos do SquashFS. `make installer-iso OUT=out/pc-official-prep/installer PC_OUT=out/pc-official-prep/verified-candidate` gerou a candidata para uso local. `make bundle-pc` e `make channel-pc` assinaram os artefatos. O SHA-256 da ISO é `c50bcd588127e4a5cbd7c8b411854f1be85116d4a4b121a3326064913f7a2057` e tem assinatura Ed25519 separada.
+
+Com OVMF e TCG, `tests/installer_vm.py --ventoy-drive` exercitou o pendrive virtual em modo normal, confirmou a instalação e os dois boots e preservou o disco vizinho. `make test-pc-desktop` verificou Umbriel, Noctalia, Alacritty, Nushell e os três navegadores com áudio em KVM. Os registros estão em `out/pc-official-prep/`. A publicação da imagem com os navegadores permanece pendente da revisão dos termos de redistribuição.

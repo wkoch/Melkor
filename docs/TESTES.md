@@ -132,7 +132,11 @@ make test-channel-pc OUT=out/pc-1 CERT="$lab/cert.pem" KEY="$lab/key.pem" \
 
 O executor verifica a configuração de fábrica, seleciona um servidor alternativo, recusa a assinatura adulterada e instala a revisão 2 com `melkor-core-update`. Após reiniciar em B, a troca de canal permanece, a revisão instalada é reconhecida como atual e o reset restaura o endereço de fábrica. Os testes Go rejeitam também manifestos expirados, revisões anteriores, URLs HTTP e respostas maiores que o limite.
 
-Para publicar, gere o bundle com `make bundle-pc`, depois use `make channel-pc` com o mesmo `OUT`, `VERSION` e `KEYRING`. Em `BUNDLE_URL`, informe a URL HTTPS permanente do bundle versionado. Publique primeiro o bundle e depois `melkor-pc-channel.json` no endereço configurado na imagem, sob a tag `pc-stable`. Renove o manifesto antes da validade de 90 dias ou ajuste `CHANNEL_DAYS`. Use a chave privada do canal só no ambiente de assinatura.
+Os builds oficiais recebem os arquivos públicos versionados em `core/board/pc/keys/` por `MELKOR_RAUC_KEYRING` e `MELKOR_CHANNEL_PUBLIC_KEY`. Compare os PEM dentro do SquashFS com esses arquivos antes de gerar a ISO. Use as chaves e os certificados de laboratório nos testes automatizados de atualização, que também usam o certificado de teste para servir HTTPS.
+
+Publique a ISO, seu SHA-256 e o bundle gerado por `make bundle-pc` na release versionada de `wkoch/Melkor`. Cada arquivo de uma release precisa ter menos de 2 GiB. [Limites do GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)
+
+Depois de conferir o download do bundle sem autenticação, execute `make channel-pc` com o mesmo `OUT`, `VERSION` e `KEYRING`. Em `BUNDLE_URL`, passe a URL HTTPS do bundle na tag versionada. Envie somente o `melkor-pc-channel.json` assinado à release `pc-stable` do mesmo repositório. Essa release precisa aceitar a substituição do manifesto nas próximas publicações. Renove-o antes da validade de 90 dias ou ajuste `CHANNEL_DAYS`. Use a chave privada do canal só no ambiente de assinatura.
 
 ### Contas locais do PC
 

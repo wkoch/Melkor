@@ -25,7 +25,7 @@ O fluxo previsto é baixar uma geração assinada do Melkor pela própria instal
 
 Quem modificar a receita poderá gerar a própria imagem em um ambiente de build, com as fontes e ferramentas necessárias. Isso pode ser feito localmente em vez de depender de outra máquina. Os projetos de origem fornecem as versões e correções usadas pelas receitas. A instalação e suas atualizações dispensam enviar alterações a esses projetos.
 
-No PC, entre com `su -` e execute `melkor-core-update`. A imagem traz o endereço do canal estável do Melkor. Com uma release assinada disponível no canal, o comando encontra a revisão, valida o manifesto e instala o bundle no slot inativo. Reinicie para ativá-lo. O endereço oficial está configurado no build e a primeira publicação no canal está pendente.
+No PC, entre com `su -` e execute `melkor-core-update`. O endereço de fábrica é `https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-channel.json`. Com uma release assinada disponível no canal, o comando encontra a revisão, valida o manifesto e instala o bundle no slot inativo. Reinicie para ativá-lo. A primeira publicação no canal está pendente. [Publicação do canal](docs/TESTES.md#canal-de-atualizações-do-pc)
 
 Para usar outro endereço HTTPS que publique manifestos assinados pela chave do canal, execute `melkor-core-update --channel URL`. A escolha persiste entre atualizações. Use `melkor-core-update --reset-channel` para restaurar o endereço de fábrica. Para instalar um bundle específico, o PC aceita `melkor-core-update --https URL SHA256` e o PC e o M1 aceitam `melkor-core-update /caminho/bundle.raucb`. `melkor atualizar` atende aos aplicativos do catálogo. [Marcos](docs/MARCOS.md)
 

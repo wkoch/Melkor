@@ -1,6 +1,6 @@
 # Repositório de receitas do Melkor
 
-O repositório `Melkor-Recipes` usa `main` para as receitas revisadas. Cada aplicativo tem um JSON em `recipes/<nome>.json`. O modelo [validar-receitas.yml](validar-receitas.yml) vai em `.github/workflows/` do repositório de receitas. A CI usa um arquivo de fontes fixado por SHA-256 em uma pré-release privada do próprio catálogo. Com o token de leitura do job ela baixa somente esse arquivo, compila o CLI e testa as receitas alteradas no PR.
+O repositório `Melkor-Recipes` usa `main` para as receitas revisadas. Cada aplicativo tem um JSON em `recipes/<nome>.json`. O modelo [validar-receitas.yml](validar-receitas.yml) vai em `.github/workflows/` do repositório de receitas. A CI usa um arquivo de fontes fixado por SHA-256 em uma pré-release do próprio catálogo. Com o token de leitura do job ela baixa somente esse arquivo, compila o CLI e testa as receitas alteradas no PR.
 
 O primeiro catálogo pode ser inicializado com [a receita validada do Nushell](../apps/recipes/nushell.json).
 
@@ -8,7 +8,7 @@ A receita descreve a origem oficial, a fonte HTTPS e seu SHA-256, a versão, a t
 
 ### Atualizar o validador da CI
 
-Com `make test` e `make tools` concluídos no Melkor, empacote a árvore revisada de `apps/`. Publique `melkor-cli.tar.gz` em uma nova pré-release privada, com tag da forma `ci-validador-v0.1.0`. Registre no corpo da pré-release o commit ou a procedência da árvore de fontes. A tag e o hash do arquivo devem ser configurados nas variáveis `MELKOR_VALIDADOR_TAG` e `MELKOR_VALIDADOR_SHA256` do catálogo. [Permissões de leitura dos workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions)
+Com `make test` e `make tools` concluídos no Melkor, empacote a árvore revisada de `apps/`. Publique `melkor-cli.tar.gz` em uma nova pré-release, com tag da forma `ci-validador-v0.1.0`. Registre no corpo da pré-release o commit ou a procedência da árvore de fontes. A tag e o hash do arquivo devem ser configurados nas variáveis `MELKOR_VALIDADOR_TAG` e `MELKOR_VALIDADOR_SHA256` do catálogo. [Permissões de leitura dos workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions)
 
 ```sh
 mkdir -p out/catalogo-validador
@@ -27,11 +27,12 @@ git -c gpg.format=ssh -c user.signingkey="$CHAVE_DE_PUBLICACAO" \
 git push origin refs/tags/v0.1.0
 ```
 
-Uma máquina pode sincronizar a tag após receber a chave pública confiável. O caminho do arquivo de assinantes é local à máquina.
+O [catálogo v0.1.0](https://github.com/wkoch/Melkor-Recipes/tree/v0.1.0) contém o Nushell 0.117.0. Da raiz de um checkout confiável do Melkor, execute os comandos abaixo no host com Go, Git, OpenSSH e Podman rootless. O arquivo [allowed_signers](allowed_signers) fixa a chave pública usada para verificar a tag.
 
 ```sh
-melkor catalogo sincronizar ssh://git@github.com/wkoch/Melkor-Recipes.git v0.1.0 ./allowed_signers
-melkor instalar <nome>
+make tools
+out/tools/melkor catalogo sincronizar https://github.com/wkoch/Melkor-Recipes.git v0.1.0 ./catalogo/allowed_signers
+out/tools/melkor instalar nushell
 ```
 
-O repositório privado usa uma identidade de leitura configurada no OpenSSH e a chave de host do GitHub já validada. A instalação consulta a versão sincronizada no perfil sem precisar falar com o GitHub para cada busca.
+A instalação consulta a versão sincronizada no perfil. O fluxo com Podman ainda é executado no host de desenvolvimento.
