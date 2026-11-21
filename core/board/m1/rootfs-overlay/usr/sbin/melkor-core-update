@@ -1,6 +1,18 @@
 #!/bin/sh
 set -eu
 
+if [ "${1:-}" = --https ]; then
+    if [ "$#" -ne 3 ] || ! test -x /usr/bin/melkor-core-fetch; then
+        printf '%s\n' 'Uso no alvo PC: melkor-core-update --https URL SHA256' >&2
+        exit 2
+    fi
+    if [ "$(id -u)" != 0 ]; then
+        printf '%s\n' 'Entre em uma sessão root para atualizar o core.' >&2
+        exit 1
+    fi
+    exec /usr/bin/flock --nonblock /run/melkor/rauc.lock /usr/bin/melkor-core-fetch "$2" "$3"
+fi
+
 if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
     printf '%s\n' 'Uso: melkor-core-update /caminho/bundle.raucb' >&2
     exit 2

@@ -35,7 +35,10 @@ class BuildScriptsTest(unittest.TestCase):
         cls.marker.touch()
         cls.prepare = cls.wrapper("prepare", f'source "{cls.scripts / "prepare-env.sh"}"\nprepare_env "$@"\n')
         cls.update = cls.wrapper("update", """id() { printf '%s\n' "$TEST_UID"; }
-exec() { printf '%s\n' "$*" >> "$TEST_BOOT_LOG"; }
+test() {
+    if [[ $* = "-x /usr/bin/melkor-core-fetch" ]]; then [[ ${TEST_CORE_FETCH:-} = yes ]]; else builtin test "$@"; fi
+}
+exec() { printf '%s\n' "$*" >> "$TEST_BOOT_LOG"; exit 0; }
 script=$1
 shift
 source "$script" "$@"
@@ -324,6 +327,17 @@ source "$1"
         self.run_script(self.update, update, bundle, TEST_UID="0")
         self.assertEqual(self.boot_log.read_text(), f"/usr/bin/flock --nonblock /run/melkor/rauc.lock "
                                                    f"/usr/bin/rauc install {bundle}\n")
+
+    def test_atualizacao_https_usa_a_mesma_trava_do_rauc(self):
+        update = self.project / "core/board/m1/rootfs-overlay/usr/sbin/melkor-core-update"
+        url, digest = "https://example.invalid/update.raucb", "a" * 64
+        self.run_script(self.update, update, "--https", url, code=2, TEST_CORE_FETCH="yes")
+        self.run_script(self.update, update, "--https", url, digest, code=2)
+        self.run_script(self.update, update, "--https", url, digest, code=1, TEST_CORE_FETCH="yes", TEST_UID="1000")
+        self.assertEqual(self.boot_log.read_text(), "")
+        self.run_script(self.update, update, "--https", url, digest, TEST_CORE_FETCH="yes", TEST_UID="0")
+        self.assertEqual(self.boot_log.read_text(), f"/usr/bin/flock --nonblock /run/melkor/rauc.lock "
+                                                   f"/usr/bin/melkor-core-fetch {url} {digest}\n")
 
     def test_boot_monta_alvos_e_interrompe_em_falha(self):
         board = self.project / "core/board"

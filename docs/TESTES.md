@@ -92,6 +92,17 @@ Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` p
 
 Para testar o RAUC nesse disco, use o procedimento de credenciais descartáveis descrito para o M1 e troque o alvo de build para `BOARD=pc`. Execute `make pc-disk` com o mesmo `OUT`, `make bundle-pc` com o certificado desse laboratório e `make test-update BOARD=pc` com o mesmo certificado, a chave e o arquivo da senha de root. A diferença de identificador RAUC entre PC e M1 também é um caso de rejeição.
 
+## Download HTTPS de atualizações do PC
+
+Use um build `BOARD=pc` com o certificado público descartável em `MELKOR_RAUC_KEYRING`. Gere o disco virtual no mesmo `OUT` passando `PC_CREDENTIALS` com os hashes da senha descartável de root e da conta comum. O teste requer Python 3.11+, QEMU, OVMF, OpenSSL e `mke2fs`.
+
+```sh
+make test-update-https OUT=out/pc-https CERT="$lab/cert.pem" KEY="$lab/key.pem" \
+    ROOT_PASSWORD_FILE="$lab/senha-root"
+```
+
+O executor abre um servidor TLS em loopback e usa uma cópia do disco com rede virtual. O caso de assinatura adulterada usa o SHA-256 do arquivo adulterado para verificar a rejeição pelo RAUC mesmo após validar o download. O teste confere que certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida preservam a ordem do GRUB e o slot inativo. O bundle válido promove B. O segundo boot confirma B e lê o documento salvo em A. Os logs seriais ficam em `OUT/https-tests/`.
+
 ### Contas locais do PC
 
 O gerador de discos virtuais aceita `PC_CREDENTIALS` como caminho para um arquivo regular de modo `0600` com duas linhas, `root:<hash>` e `melkor:<hash>`. Cada hash usa SHA-512 crypt, como na saída de `openssl passwd -6`. O build fornece `fakeroot` para que `mke2fs` grave os metadados de propriedade na imagem. O arquivo de hashes e as senhas descartáveis ficam fora do Git.

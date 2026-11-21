@@ -26,23 +26,24 @@ INPUT = "/persist/rauc/test-bundle.raucb"
 UPDATE = f"/usr/sbin/melkor-core-update {INPUT}"
 
 
-def fixture_images(build, work):
+def fixture_images(build, work, outcomes=("healthy", "unhealthy")):
     host = build / "host/bin"
     source = build / "images/rootfs.squashfs"
     empty = work / "empty"
     empty.mkdir()
     pseudo = work / "original.pseudo"
     subprocess.run([host / "unsquashfs", "-processors", "2", "-pf", pseudo, source], check=True)
-    header, separator, payload = pseudo.read_bytes().partition(b"# START OF DATA - DO NOT MODIFY\n")
-    assert separator, "Metadados SquashFS ausentes."
-    filename = b"etc/dinit.d/rauc-confirm"
-    lines = header.splitlines(keepends=True)
-    filtered = [line for line in lines if not line.startswith(filename + b" ")]
-    assert len(filtered) == len(lines) - 1, "Serviço de confirmação ausente."
-    unhealthy = work / "unhealthy.pseudo"
-    unhealthy.write_bytes(b"".join(filtered) + separator + payload)
-
-    for name, metadata in (("healthy", pseudo), ("unhealthy", unhealthy)):
+    for name in outcomes:
+        metadata = pseudo
+        if name == "unhealthy":
+            header, separator, payload = pseudo.read_bytes().partition(b"# START OF DATA - DO NOT MODIFY\n")
+            assert separator, "Metadados SquashFS ausentes."
+            filename = b"etc/dinit.d/rauc-confirm"
+            lines = header.splitlines(keepends=True)
+            filtered = [line for line in lines if not line.startswith(filename + b" ")]
+            assert len(filtered) == len(lines) - 1, "Serviço de confirmação ausente."
+            metadata = work / "unhealthy.pseudo"
+            metadata.write_bytes(b"".join(filtered) + separator + payload)
         command = [host / "mksquashfs", empty, work / f"{name}.squashfs", "-noappend", "-processors", "2",
                    "-no-progress", "-comp", "gzip", "-pf", metadata, "-p",
                    f"etc/melkor-test-generation f 0644 0 0 echo {name}"]
@@ -86,7 +87,7 @@ def seed_disk(args, work):
 
 
 @contextmanager
-def machine(work, stage, disk, seed, code, variables, timeout, accel, write_limit=False):
+def machine(work, stage, disk, seed, code, variables, timeout, accel, write_limit=False, network=False):
     binary = os.environ.get("QEMU_SYSTEM") or shutil.which("qemu-system-x86_64", path=BOOT["SYSTEM_PATH"])
     if not binary:
         raise RuntimeError("Instale qemu-system-x86_64.")
@@ -97,8 +98,9 @@ def machine(work, stage, disk, seed, code, variables, timeout, accel, write_limi
     disk_options = "if=none,id=melkor,cache=none"
     if write_limit:
         disk_options += ",bps_wr=2097152"
+    nic = "user,model=virtio-net-pci" if network else "none"
     argv = [binary, "-machine", "q35", "-accel", accel, "-m", "512", "-display", "none", "-serial", "stdio",
-            "-monitor", "none", "-nic", "none", "-no-reboot",
+            "-monitor", "none", "-nic", nic, "-no-reboot",
             "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
             "-drive", drive(variables, "if=pflash,unit=1"),
             "-drive", drive(disk, disk_options),

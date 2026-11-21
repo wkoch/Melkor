@@ -12,7 +12,7 @@ BUILD_ENV ?= distrobox enter -n melkor-build --
 endif
 endif
 
-.PHONY: env check-env image installer-iso test-installer test-boot check-m1 bundle-m1 bundle-pc test-update test-dns test-live-wifi tools test test-packages pc-disk test-pc-disk test-pc-desktop
+.PHONY: env check-env image installer-iso test-installer test-boot check-m1 bundle-m1 bundle-pc test-update test-update-https test-dns test-live-wifi tools test test-packages pc-disk test-pc-disk test-pc-desktop
 env:
 	./scripts/prepare-env.sh prepare "$(BOARD)"
 
@@ -55,6 +55,12 @@ test-update:
 	$(BUILD_ENV) python3 tests/m1_update_vm.py "$(OUT)/build" --cert "$(CERT)" --key "$(KEY)" \
 		--root-password-file "$(ROOT_PASSWORD_FILE)" --log-dir "$(OUT)/update-tests" \
 		$(if $(filter pc,$(BOARD)),--pc-image "$(OUT)/melkor-pc.img")
+
+test-update-https: BOARD = pc
+test-update-https:
+	$(BUILD_ENV) python3 tests/pc_https_update_vm.py "$(OUT)/build" "$(OUT)/melkor-pc.img" \
+		--cert "$(CERT)" --key "$(KEY)" --root-password-file "$(ROOT_PASSWORD_FILE)" \
+		--log-dir "$(OUT)/https-tests"
 
 test-dns: BOARD = m1
 test-dns:

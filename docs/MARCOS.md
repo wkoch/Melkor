@@ -55,7 +55,7 @@ O SHA-256 da imagem é `dd0e00611b6afb92cba4802f8f131897fff789935373701645abd1a9
 
 `make test` passou com 84,9% das instruções Go, 95,5% das instruções e ramos Python e 96,0% das linhas Shell. Cada script Shell superou 80%. Relatórios em `out/coverage/test-ho6gs7q9/`. `make test-boot OUT=out/m0-revalidado` também passou na regressão de boot do M0.
 
-Faltam Kibi e a mídia de recuperação, o provisionamento de instalações em disco físico e o fluxo de publicação e download de bundles. A validação de saúde do desktop fica para o M2.
+Faltam Kibi, a mídia de recuperação, a publicação de bundles assinados e o teste de instalação em disco físico. O download explícito de bundles pelo PC está descrito adiante. A validação de saúde do desktop fica para o M2.
 
 ### Validação do DNS do sistema
 
@@ -193,6 +193,14 @@ O build limpo `make image BOARD=pc OUT=out/pc-clean` gerou o SquashFS, o kernel 
 
 O mesmo core, reempacotado com o certificado público de laboratório, repetiu os três cenários de `make test-update BOARD=pc` em KVM. As credenciais de root vieram do volume persistente. O RAUC rejeitou os três bundles de teste inválidos, promoveu a candidata saudável, voltou ao slot A após falha de confirmação e aceitou nova instalação após a interrupção de escrita. Evidências em `out/pc-clean-rauc-evidence/`.
 
+### Atualização por HTTPS no PC
+
+O Buildroot recompilou a receita `melkor-storage` e montou a raiz do PC em um diretório vazio com a toolchain já verificada. O SquashFS recebeu o certificado público descartável do RAUC. A verificação com `sha256sum -c ../../SHA256SUMS` aprovou o SquashFS, o kernel e o GRUB em `out/pc-https/build/images/`. `make pc-disk OUT=out/pc-https PC_CREDENTIALS=…` preparou o disco virtual com senhas separadas.
+
+Com KVM, `make test-update-https OUT=out/pc-https CERT=… KEY=… ROOT_PASSWORD_FILE=…` verificou a trava de atualização e a recusa de certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida. Nenhuma recusa mudou a ordem do GRUB ou o slot inativo. A atualização válida preservou A, iniciou B com o marcador da geração candidata e manteve o documento do usuário. Os logs estão em `out/pc-https/https-tests/https-fdtkvvy2/`. `make test-pc-desktop OUT=out/pc-https-desktop` também passou com o mesmo SquashFS. [Procedimento de laboratório](TESTES.md#download-https-de-atualizações-do-pc)
+
+`make test` passou com 41 testes Python e cobertura de 80,2% em Go, 92,4% em Python e 96,4% em Shell. O teste usou certificados descartáveis e o canal público de bundles assinados segue pendente.
+
 ### Instalação offline pela ISO
 
 A mídia dedicada empacota o core PC e prepara uma GPT pelo tamanho e pelo setor lógico do disco selecionado. O fluxo pede confirmação pelo ID estável e provisiona as duas contas antes de abrir o destino para gravação. A ISO foi validada com o NVMe que recebe o sistema e outro NVMe gravável. Os testes comparam os hashes do vizinho e iniciam os dois slots com a mídia removida. A instalação física no HP, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam pendentes.
@@ -202,3 +210,5 @@ A mídia dedicada empacota o core PC e prepara uma GPT pelo tamanho e pelo setor
 `make test` passou com 40 testes Python e cobertura de 80,7% em Go, 92,4% em Python e 96,3% em Shell. [Roteiro de validação](TESTES.md#instalação-de-disco-inteiro)
 
 A mesma ISO passou pela instalação offline em QEMU 11.1.3 com OVMF e TCG, como CD UEFI com setores lógicos de 512 bytes, pelo modo normal do Ventoy 1.1.18 com 512 bytes e pelo modo GRUB2 com 4096 bytes. Em cada um, a confirmação inválida preservou o destino. A instalação válida fez a GPT até a reserva final, protegeu as senhas e chegou ao login nos dois slots, com swap ativo e o mesmo documento. O disco vizinho de 13 GiB manteve o SHA-256 integral. Os relatórios estão em `out/installer-clean/evidence/`.
+
+`make installer-iso OUT=out/installer-https-lab PC_OUT=out/pc-https` reempacotou a mídia com o core que inclui o atualizador. `make test-installer BUILD_ENV= OUT=out/installer-https-lab` passou pelo CD UEFI com o QEMU 11.1.3 do host em TCG. Os dois slots iniciaram e o disco vizinho manteve seu SHA-256. O relatório está em `out/installer-https-lab/tests/install-ac346fvy/result.json`.
