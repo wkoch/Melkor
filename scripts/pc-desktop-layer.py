@@ -51,8 +51,8 @@ export TMPDIR=/work
 mkdir -p /usr/include/stb
 for header in /usr/include/stb_*.h; do ln -s "$header" /usr/include/stb/; done
 mkdir /work/src-noctalia /work/src-umbriel
-tar -xzf /packages/noctalia-v5.6.0.tar.gz -C /work/src-noctalia --strip-components=1
-tar -xzf /packages/umbriel.tar.gz -C /work/src-umbriel --strip-components=1
+tar -xzof /packages/noctalia-v5.6.0.tar.gz -C /work/src-noctalia --strip-components=1
+tar -xzof /packages/umbriel.tar.gz -C /work/src-umbriel --strip-components=1
 meson setup /work/build-umbriel /work/src-umbriel --prefix=/opt/melkor-desktop/usr \
     --buildtype=release -Dtests=disabled -Djemalloc=disabled -Dlocaled=disabled
 meson setup /work/build-noctalia /work/src-noctalia --prefix=/opt/melkor-desktop/usr \
