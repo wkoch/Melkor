@@ -22,6 +22,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	flags.StringVar(&input.CoreSHA256, "sha256", "", "SHA-256 esperado do core")
 	flags.StringVar(&input.EFI, "efi", "", "executável GRUB bootx64.efi")
 	flags.StringVar(&input.GRUB, "grub", "", "modelo de grub.cfg da geração")
+	flags.StringVar(&input.Credentials, "credenciais", "", "arquivo 0600 com hashes locais root e melkor")
 	size := flags.Uint64("gib", 16, "capacidade do disco virtual em GiB")
 	if err := flags.Parse(args); err != nil {
 		return err

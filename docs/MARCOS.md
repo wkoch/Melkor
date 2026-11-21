@@ -187,4 +187,6 @@ O alvo `pc` exercita a distribuição de espaço em disco, a atualização do co
 | `make bundle-pc OUT=out/pc-rauc-lab …` e `QEMU_ACCEL=tcg make test-update BOARD=pc OUT=out/pc-rauc-lab …` | O core recusou bundle adulterado, assinatura inválida e uma imagem para M1. O teste confirmou a atualização A → B, a volta automática a A após falha de confirmação e nova instalação após interromper a gravação. O documento do usuário persistiu. Evidências em `out/pc-rauc-lab/update-tests/rauc-i5b9nxu6/`. |
 | `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | 36 testes Python e cobertura de 84,9% em Go, 94,5% em Python e 96,9% em Shell. |
 
-A sessão do PC ainda usa as credenciais de laboratório. A instalação em disco real, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam em desenvolvimento.
+Em um disco de laboratório criado com `make pc-disk OUT=out/pc-credentials-lab PC_CREDENTIALS=…`, `make test-pc-disk` recusou a senha antiga e verificou a proteção das credenciais, a sessão comum e o `su -` com senha separada nos dois slots. O cenário usou o SquashFS anterior com o novo executável e o script de persistência empacotados na VM. Evidências em `out/pc-credentials-lab/tests/boot-0kh1y6vq/`.
+
+A instalação em disco real, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam em desenvolvimento.

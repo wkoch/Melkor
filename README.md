@@ -59,6 +59,7 @@ O host Bazzite é imutável e não tem `sudo` sem senha. As ferramentas de build
 | `make test-live-wifi HWSIM=…` | Build Live, QEMU, `cpio` e módulo `mac80211_hwsim.ko` compilado para o mesmo kernel | Exercita a associação WPA2 pelo usuário comum, sem usar a rede do host. [Preparação do módulo](docs/TESTES.md#associação-wi-fi-em-qemu) |
 | `make env BOARD=pc` e `make image BOARD=pc` | Contêiner de build, cache de fontes e saída própria para o alvo PC | Gera o core, o kernel e o bootloader do protótipo PC. |
 | `make pc-disk` e `make test-pc-disk` | Build PC, Go, `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools`, QEMU e OVMF | Cria um arquivo de disco de laboratório e inicia seus dois slots por NVMe virtual. `PC_DISK_GIB` ajusta os 16 GiB iniciais. |
+| `make pc-disk PC_CREDENTIALS=…` | Build PC, `fakeroot` do Buildroot e arquivo privado de hashes | Registra senhas separadas de root e do usuário comum nos dados persistentes. [Validação das contas](docs/TESTES.md#contas-locais-do-pc) |
 | `make test-pc-desktop` | Disco virtual PC, QEMU e OVMF | Exercita o login local e a abertura de um terminal Wayland a partir do painel do Weston. |
 | `make test-dns OUT=out/m1-doh` | Imagem M1, QEMU, OVMF, `tcpdump` e acesso HTTPS ao Quad9 | Confirma DoH pelo resolvedor da VM e inspeciona o tráfego com e sem acesso à internet. Use `DNS_IPV6_ONLY=1` em um host com acesso IPv6. |
 | `make test-dns BOARD=live` | ISO Live, QEMU, OVMF, `tcpdump` e acesso HTTPS ao Quad9 | Executa os mesmos casos de DoH pelo adaptador Ethernet virtual da sessão Live. |

@@ -161,6 +161,17 @@ class SerialTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "PC-SWAP=ok"):
                 boot.check_console(process, io.BytesIO(), timeout=1, slot="A", pc=True)
 
+    def test_disco_pc_exige_senha_root_separada_e_protege_shadow(self):
+        rejected = b"\rmelkor login: \n\rPassword: \n\rLogin incorrect\r\n"
+        privilege = b"PC-USER=ok\nPassword: \nmelkor# \nPC-ROOT=ok\nmelkor$ \n"
+        persist = (b"\nPC-SWAP=ok\nM1-VERSION=pc\nM1-SLOT=rauc.slot=A\nM1-DATA=rw,nosuid\n"
+                   b"M1-DOCUMENT=melkor-m1-persistencia\nM1-SYNC=ok\nM1-END\n")
+        with console(rejected + LOGIN + privilege + PROBE + persist) as process:
+            boot.check_console(process, io.BytesIO(), timeout=1, slot="A", pc=True,
+                               credentials=(b"usuario", b"administracao"))
+            self.assertTrue(process.stdin.getvalue().startswith(b"melkor\rmelkor\rmelkor\rusuario\r"))
+            self.assertIn(b"su -\radministracao\r", process.stdin.getvalue())
+
     def test_boot_rejeita_identidade_ou_raiz_incorreta(self):
         for target, replacement, error in (
             (b"M0-UEFI=yes", b"M0-UEFI=no", "M0-UEFI=yes"),
@@ -205,6 +216,7 @@ class BootRunnerTest(unittest.TestCase):
             file.write_bytes(file.name.encode())
         self.args = argparse.Namespace(
             image=self.disk, ovmf_code=self.code, ovmf_vars=self.variables, ab=False, live=False, pc=False,
+            pc_user_password=None, pc_root_password=None,
             accel="auto", timeout=None,
         )
 

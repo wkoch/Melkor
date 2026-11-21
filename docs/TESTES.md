@@ -84,6 +84,29 @@ Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` p
 
 Para testar o RAUC nesse disco, use o procedimento de credenciais descartáveis descrito para o M1 e troque o alvo de build para `BOARD=pc`. Execute `make pc-disk` com o mesmo `OUT`, `make bundle-pc` com o certificado desse laboratório e `make test-update BOARD=pc` com o mesmo certificado, a chave e o arquivo da senha de root. A diferença de identificador RAUC entre PC e M1 também é um caso de rejeição.
 
+### Contas locais do PC
+
+O gerador de discos virtuais aceita `PC_CREDENTIALS` como caminho para um arquivo regular de modo `0600` com duas linhas, `root:<hash>` e `melkor:<hash>`. Cada hash usa SHA-512 crypt, como na saída de `openssl passwd -6`. O build fornece `fakeroot` para que `mke2fs` grave os metadados de propriedade na imagem. O arquivo de hashes e as senhas descartáveis ficam fora do Git.
+
+Com um build PC pronto em `out/pc` e sem um `melkor-pc.img` nessa saída, gere um novo disco e teste as contas em QEMU.
+
+```sh
+umask 077
+lab=$(mktemp -d "$PWD/out/pc-contas.XXXXXX")
+openssl rand -hex 16 > "$lab/senha-root"
+openssl rand -hex 16 > "$lab/senha-melkor"
+{
+    printf 'root:'
+    openssl passwd -6 -stdin < "$lab/senha-root"
+    printf 'melkor:'
+    openssl passwd -6 -stdin < "$lab/senha-melkor"
+} > "$lab/credenciais"
+make pc-disk PC_CREDENTIALS="$lab/credenciais"
+make test-pc-disk PC_ROOT_PASSWORD_FILE="$lab/senha-root" PC_USER_PASSWORD_FILE="$lab/senha-melkor"
+```
+
+O teste rejeita a senha de laboratório antiga, autentica o usuário comum e confirma a proteção do shadow e do arquivo persistente. Em seguida, autentica `su -` com a senha separada de root. O fluxo se repete após a troca de slot e verifica o documento e o swap.
+
 ## Protótipo A/B do M1
 
 Execute `make check-m1` com a imagem já gerada, Python, `sfdisk` e `blkid`. A verificação inspeciona o GPT, os quatro sistemas de arquivos, o estado inicial do GRUB, a associação entre os `PARTUUIDs` e os slots do RAUC, os kernels e o UUID usado para montar os dados. Ela lê o arquivo de disco sem criar dispositivos de bloco no host.

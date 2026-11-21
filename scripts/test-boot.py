@@ -141,7 +141,7 @@ def login(console, user, password, prompt):
     console.expect(prompt, "shell do convidado")
 
 
-def check_console(process, log, timeout, slot=None, pc=False):
+def check_console(process, log, timeout, slot=None, pc=False, credentials=None):
     with serial_console(process, log, timeout) as console:
         if slot == "B":
             label = b"Melkor Linux PC - slot " if pc else b"Melkor Linux M1 - slot "
@@ -157,7 +157,27 @@ def check_console(process, log, timeout, slot=None, pc=False):
                     raise RuntimeError("O GRUB iniciou o slot A antes de confirmar a seleção de B.")
             console.send(b"")
 
-        login(console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
+        if credentials:
+            console.expect(rb"^\r?melkor login: ?", "prompt antes de testar a credencial antiga")
+            console.send(b"melkor")
+            console.expect(rb"^\r?Password: ?", "prompt da senha antiga")
+            console.send(b"melkor")
+            console.expect(rb"^\r?Login incorrect\r?$", "recusa da senha antiga")
+            login(console, b"melkor", credentials[0], rb"^[^\n]*\$ ")
+            console.send(b'test ! -r /etc/shadow && test ! -r /persist/.melkor/credenciais '
+                         b'&& test ! -w /etc && test ! -w /dev/nvme0n1 && printf "\\nPC-USER=ok\\n"')
+            console.expect(rb"^PC-USER=ok\r?$", "limites da conta comum")
+            console.send(b"su -")
+            console.expect(rb"^\r?Password: ?", "senha separada de root")
+            console.send(credentials[1])
+            console.expect(rb"^[^\n]*# ", "sessão root")
+            console.send(b'test "$(id -u)" = 0 && ls -ln /etc/shadow | '
+                         b'awk \'$1 == "-rw-------" && $3 == 0 && $4 == 0 {print "PC-ROOT=ok"}\'')
+            console.expect(rb"^PC-ROOT=ok\r?$", "conta root e permissões do shadow")
+            console.send(b"exit")
+            console.expect(rb"^[^\n]*\$ ", "retorno à conta comum")
+        else:
+            login(console, b"melkor", b"melkor", rb"^[^\n]*\$ ")
         console.send(PROBE.encode("ascii"))
         result = console.expect(rb"^M0-END\r?$", "resposta das verificações")
         if slot:
@@ -225,6 +245,11 @@ def run(args, report_dir, report):
     if not image.is_file():
         raise RuntimeError(f"Imagem de disco virtual ausente: {image}. Execute make image.")
     report.update(image=str(image), image_sha256=file_digest(image))
+    credentials = None
+    if args.pc_user_password is not None:
+        credentials = tuple(path.read_bytes().strip() for path in (args.pc_user_password, args.pc_root_password))
+        if any(not re.fullmatch(rb"[0-9a-f]{32}", password) for password in credentials) or credentials[0] == credentials[1]:
+            raise RuntimeError("Use senhas distintas e descartáveis geradas por openssl rand -hex 16.")
 
     qemu = os.environ.get("QEMU_SYSTEM") or shutil.which("qemu-system-x86_64", path=SYSTEM_PATH)
     if qemu is None:
@@ -285,7 +310,7 @@ def run(args, report_dir, report):
                 if args.live:
                     check_live_console(process, log, timeout, optical)
                 else:
-                    check_console(process, log, timeout, slot, pc=args.pc)
+                    check_console(process, log, timeout, slot, pc=args.pc, credentials=credentials)
             finally:
                 if process.poll() is None:
                     process.kill()
@@ -311,11 +336,16 @@ def main():
     parser.add_argument("--ovmf-vars", type=Path, default=os.environ.get("OVMF_VARS"))
     parser.add_argument("--accel", choices=("auto", "kvm", "tcg"), default=os.environ.get("QEMU_ACCEL", "auto"))
     parser.add_argument("--timeout", type=int)
+    parser.add_argument("--pc-user-password", type=Path, help="Arquivo com a senha descartável do usuário.")
+    parser.add_argument("--pc-root-password", type=Path, help="Arquivo com a senha descartável de root.")
     args = parser.parse_args()
     if args.timeout is not None and args.timeout <= 0:
         parser.error("--timeout precisa ser maior que zero.")
     if args.accel not in ("auto", "kvm", "tcg"):
         parser.error("QEMU_ACCEL deve ser auto, kvm ou tcg.")
+    passwords = (args.pc_user_password, args.pc_root_password)
+    if any(passwords) and (not args.pc or not all(passwords)):
+        parser.error("Informe ambos os arquivos de senha e use --pc.")
 
     args.log_dir.mkdir(parents=True, exist_ok=True)
     report_dir = Path(tempfile.mkdtemp(prefix="boot-", dir=args.log_dir.resolve()))

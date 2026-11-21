@@ -45,6 +45,10 @@ source "$script" "$@"
     return "${TEST_MOUNT_CODE:-0}"
 }
 hostname() { printf 'hostname %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+melkor-storage() {
+    printf 'melkor-storage %s\n' "$*" >> "$TEST_BOOT_LOG"
+    return "${TEST_CREDENTIALS_CODE:-0}"
+}
 exec() { printf '%s\n' "$*" >> "$TEST_BOOT_LOG"; }
 install() { printf 'install %s\n' "$*" >> "$TEST_BOOT_LOG"; }
 mkdir() { printf 'mkdir %s\n' "$*" >> "$TEST_BOOT_LOG"; }
@@ -252,10 +256,14 @@ source "$1"
         self.run_script(self.boot, root / "melkor-pc-persist", code=1, TEST_MOUNT_CODE="1")
         self.assertNotIn("bind", self.boot_log.read_text())
         self.boot_log.write_text("")
+        self.run_script(self.boot, root / "melkor-pc-persist", code=1, TEST_CREDENTIALS_CODE="1")
+        self.assertNotIn("bind", self.boot_log.read_text())
+        self.boot_log.write_text("")
         self.run_script(self.boot, root / "melkor-pc-persist")
         self.run_script(self.boot, root / "melkor-rauc-setup")
         log = self.boot_log.read_text()
         self.assertIn("/run/melkor/data /persist", log)
+        self.assertIn("melkor-storage credenciais", log)
         self.assertIn("mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp", log)
         self.assertIn("/persist/melkor /home/melkor", log)
         self.assertIn("install -d -m 0700 -o root -g root /persist/iwd", log)

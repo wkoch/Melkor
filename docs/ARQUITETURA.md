@@ -42,6 +42,8 @@ O Buildroot 2025.02.20 fornece a receita, o hash de fonte e os patches do RAUC 1
 
 O alvo `pc` usa uma ESP de 128 MiB, dois slots de 2 GiB e ext4 no espaço disponível para dados. O gerador Go cria UUIDs novos, valida o SHA-256 do SquashFS e publica o arquivo de disco após completar a preparação. O GRUB encontra a raiz pelo `PARTUUID` do slot. No boot, `melkor-storage` encontra o disco-pai da raiz montada no `sysfs` e resolve os quatro dispositivos pela ordem e pelos nomes GPT. O dinit monta os dados antes do console e ativa um arquivo de swap de 4 GiB. O identificador RAUC do alvo é `melkor-pc-x86_64`.
 
+Ao provisionar contas, o gerador grava os hashes de root e de `melkor` em um diretório privado de root na ext4. Antes do login, `melkor-storage` verifica a propriedade e as permissões, compõe o shadow com as contas de serviço da geração e monta o arquivo resultante sobre `/etc/shadow`. A troca de slot usa os mesmos dados. Uma provisão presente e inválida impede o login.
+
 Para exercitar vídeo e entrada no PC, o core de laboratório inclui eudev 3.2.14, seatd 0.9.1, Weston 14.0.1 e foot 1.16.2, das receitas do Buildroot fixado. A sessão começa como usuário comum e usa DRM com Pixman. O módulo AMDGPU e o firmware do kernel entram no core para os testes do HP. A sessão prevista para uso diário integra Umbriel e Noctalia. O alvo PC atual usa credenciais de laboratório e é preparado em um arquivo regular para QEMU. [Requisitos de empacotamento do Umbriel](https://github.com/noctalia-dev/umbriel/blob/main/PACKAGING.md)
 
 ### Rede e DNS do core

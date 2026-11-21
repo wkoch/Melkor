@@ -19,6 +19,7 @@ type ImageInput struct {
 	CoreSHA256  string
 	EFI         string
 	GRUB        string
+	Credentials string
 }
 
 func CreateImage(ctx context.Context, input ImageInput) (Layout, error) {
@@ -72,8 +73,19 @@ func CreateImage(ctx context.Context, input ImageInput) (Layout, error) {
 	data := layout.Partitions[3]
 	offset := data.Start * layout.SectorSize
 	blocks := data.Size * layout.SectorSize / 4096
-	if err := run(ctx, "", "mke2fs", "-q", "-F", "-t", "ext4", "-b", "4096", "-L", "melkor-data",
-		"-E", fmt.Sprintf("offset=%d", offset), disk.Name(), fmt.Sprint(blocks)); err != nil {
+	mkfs := []string{"-q", "-F", "-t", "ext4", "-b", "4096", "-L", "melkor-data",
+		"-E", fmt.Sprintf("offset=%d,root_owner=0:0", offset), disk.Name(), fmt.Sprint(blocks)}
+	program := "mke2fs"
+	if input.Credentials != "" {
+		seed, err := stageCredentials(input.Credentials, work)
+		if err != nil {
+			return Layout{}, err
+		}
+		program = "fakeroot"
+		mkfs = append([]string{"--", "/bin/sh", "-ec", `seed=$1; shift; chown -R 0:0 "$seed"; exec mke2fs -d "$seed" "$@"`,
+			"melkor-disco", seed}, mkfs...)
+	}
+	if err := run(ctx, "", program, mkfs...); err != nil {
 		return Layout{}, err
 	}
 	if err := disk.Sync(); err != nil {

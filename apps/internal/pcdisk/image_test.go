@@ -17,7 +17,7 @@ func imageFixture(t *testing.T) ImageInput {
 	if err := os.Mkdir(bin, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"sfdisk", "mke2fs", "grub-editenv", "mkfs.vfat", "mcopy"} {
+	for _, name := range []string{"sfdisk", "mke2fs", "grub-editenv", "mkfs.vfat", "mcopy", "fakeroot"} {
 		text := "#!/bin/sh\n[ \"${TEST_DISK_FAIL:-}\" != \"${0##*/}\" ]\n"
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(text), 0o700); err != nil {
 			t.Fatal(err)
@@ -36,6 +36,31 @@ func imageFixture(t *testing.T) ImageInput {
 		}
 	}
 	return input
+}
+
+func TestDiscoRejeitaCredenciaisInvalidasAntesDePublicar(t *testing.T) {
+	input := imageFixture(t)
+	input.Credentials = filepath.Join(filepath.Dir(input.Destination), "credenciais")
+	if err := os.WriteFile(input.Credentials, []byte("root:senha\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateImage(context.Background(), input); err == nil || !strings.Contains(err.Error(), "dois hashes") {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if _, err := os.Stat(input.Destination); !os.IsNotExist(err) {
+		t.Fatal("imagem publicada com credenciais inválidas")
+	}
+
+	if err := os.WriteFile(input.Credentials, []byte(rawCredentials(testCredentials)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TEST_DISK_FAIL", "fakeroot")
+	if _, err := CreateImage(context.Background(), input); err == nil || !strings.Contains(err.Error(), "fakeroot") {
+		t.Fatalf("o gerador ignorou a falha de provisionamento: %v", err)
+	}
+	if _, err := os.Stat(input.Destination); !os.IsNotExist(err) {
+		t.Fatal("imagem publicada sem a provisão de credenciais")
+	}
 }
 
 func TestGravaCoreNosDoisSlotsEPublicaDisco(t *testing.T) {

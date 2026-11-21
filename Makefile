@@ -23,7 +23,9 @@ image:
 
 test-boot:
 	$(BUILD_ENV) python3 scripts/test-boot.py "$(if $(filter pc,$(BOARD)),$(OUT)/melkor-pc.img,$(OUT)/build/images/melkor-$(BOARD).img)" --log-dir "$(OUT)/tests" \
-		$(if $(filter pc,$(BOARD)),--pc) $(if $(filter m1,$(BOARD)),--ab) $(if $(filter live,$(BOARD)),--live)
+		$(if $(filter pc,$(BOARD)),--pc) $(if $(filter m1,$(BOARD)),--ab) $(if $(filter live,$(BOARD)),--live) \
+		$(if $(PC_USER_PASSWORD_FILE),--pc-user-password "$(PC_USER_PASSWORD_FILE)") \
+		$(if $(PC_ROOT_PASSWORD_FILE),--pc-root-password "$(PC_ROOT_PASSWORD_FILE)")
 
 check-m1: BOARD = m1
 check-m1:
@@ -60,7 +62,8 @@ pc-disk:
 	$(BUILD_ENV) env PATH="$(abspath $(OUT))/build/host/bin:/usr/bin:/usr/sbin" "$(OUT)/melkor-disco" \
 		-saida "$(OUT)/melkor-pc.img" -gib "$(PC_DISK_GIB)" -core "$(OUT)/build/images/rootfs.squashfs" \
 		-sha256 "$$(awk '$$2 == "rootfs.squashfs" {print $$1}' "$(OUT)/SHA256SUMS")" \
-		-efi "$(OUT)/build/images/efi-part/EFI/BOOT/bootx64.efi" -grub core/board/pc/grub.cfg
+		-efi "$(OUT)/build/images/efi-part/EFI/BOOT/bootx64.efi" -grub core/board/pc/grub.cfg \
+		$(if $(PC_CREDENTIALS),-credenciais "$(PC_CREDENTIALS)")
 
 test-pc-disk: BOARD = pc
 test-pc-disk: test-boot
