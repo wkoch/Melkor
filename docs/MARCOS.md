@@ -273,6 +273,12 @@ Em 22 de novembro de 2026, `make pc-desktop-layer pc-session-layer` montou o run
 
 Uma sondagem separada no disco virtual consultou `/sys/power/state` e `/sys/power/mem_sleep`, escolheu `deep` e escreveu `mem` como root. O QMP confirmou o estado suspenso e aceitou `system_wakeup`. O convidado manteve a tela preta e o console serial não confirmou a retomada no prazo do executor. O acionamento automático pela tampa e a hibernação continuam pendentes. Registros em `out/pc-noctalia-luciole/probe-suspend-retry.log`.
 
+### Primeira publicação do canal de desktop
+
+Em 22 de novembro de 2026, `make bundle-pc` assinou o SquashFS testado da revisão 2. `make channel-pc CHANNEL_DESKTOP=1` verificou o bundle e assinou o manifesto publicado em `publicacao/canal/`. A ISO mínima foi recomposta a partir do instalador com seleção numérica. A revisão 1 recebeu a configuração do canal, `melkor-finalizar` e os dois executáveis do fluxo de atualização do build testado. O SHA-256 da ISO foi assinado com Ed25519. [Release do PC Desktop](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.5-desktop)
+
+O executor `tests/installer_vm.py --desktop-bundle … --memory-mib 8192` instalou a ISO, iniciou os dois slots e aplicou o bundle assinado. O teste gráfico usou a senha criada na instalação e abriu o Luciole. Duas VMs adicionais baixaram o pacote público, uma via `melkor-finalizar` e outra via `melkor-core-update --https` da revisão pública anterior. As duas aplicaram a revisão 2. O RAUC confirmou o slot B após a reinicialização. Evidências em `out/pc-noctalia-luciole/core/` nos relatórios `release-iso-tests/install-dcqf4c95/result.json`, `rede-final.log` e `rede-legado.log`.
+
 ### Instalação mínima com seleção numérica
 
 `make image BOARD=pc` passou a selecionar o core mínimo quando não há camadas gráficas. O candidato local reutilizou o kernel, o initramfs e a entrada UEFI da ISO mínima assinada. Uma camada cpio inseriu `melkor-instalar` recompilado com o Go do host e o SquashFS base recebeu `melkor-finalizar`. O SquashFS foi reempacotado com `unsquashfs -pf` e `mksquashfs -pf`, com metadados e chaves de confiança conferidos. O xorriso 1.5.8 do Alpine remontou a ISO de teste. O SHA-256 firmado dessa mídia é `ea2b0de13beb7734fcdb8be6b4b2f9be3a2bfb652fc6f81de02940c94f2ac433`.
