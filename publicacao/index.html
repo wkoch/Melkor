@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR" data-type="software">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Melkor Linux, uma distribuição pessoal para PCs x86-64. Baixe o PC Core ou consulte o guia de instalação.">
+  <meta name="page-type" content="software">
+  <meta name="site-kind" content="software">
+  <meta name="theme-color" content="#141921">
+  <title>Melkor Linux</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, sans-serif;
+      background: #141921;
+      color: #f7f6f1;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+
+    main {
+      display: grid;
+      align-content: center;
+      min-height: 100vh;
+      min-height: 100svh;
+      max-width: 64rem;
+      margin-inline: auto;
+      padding: 3rem clamp(1.5rem, 7vw, 6rem);
+    }
+
+    h1 {
+      max-width: 100%;
+      margin: 0;
+      font-size: clamp(2.75rem, 9vw, 5.5rem);
+      font-weight: 750;
+      letter-spacing: -0.055em;
+      line-height: 1;
+    }
+
+    p {
+      max-width: 37rem;
+      margin: 1.5rem 0 2rem;
+      color: #c5ceda;
+      font-size: clamp(1.05rem, 2.3vw, 1.25rem);
+      line-height: 1.6;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1.5rem;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+      color: inherit;
+      text-underline-offset: 0.25em;
+    }
+
+    a:focus-visible {
+      outline: 2px solid #aae6b9;
+      outline-offset: 5px;
+    }
+
+    .download {
+      padding: 0.65rem 1rem;
+      border-radius: 0.35rem;
+      background: #aae6b9;
+      color: #141921;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .download:hover { background: #c6f2d0; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      [data-enter] { animation: entrar 420ms ease-out both; }
+      .download { transition: background-color 140ms ease, transform 140ms ease; }
+      .download:hover { transform: translateY(-2px); }
+      .download:active { transform: translateY(1px); }
+
+      @keyframes entrar {
+        from { opacity: 0; transform: translateY(0.45rem); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    }
+  </style>
+</head>
+<body>
+  <main data-enter>
+    <h1>Melkor Linux</h1>
+    <p>Uma distribuição Linux pessoal para PCs x86-64. A edição PC Core inclui instalação UEFI, rede e atualizações assinadas em dois slots.</p>
+    <nav aria-label="Links do projeto">
+      <a class="download" href="https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.4-core">Baixar o PC Core</a>
+      <a href="https://github.com/wkoch/Melkor/blob/main/docs/INSTALACAO.md">Guia de instalação</a>
+      <a href="https://github.com/wkoch/Melkor">Código no GitHub</a>
+    </nav>
+  </main>
+</body>
+</html>
