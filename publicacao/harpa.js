@@ -6,45 +6,22 @@ const ink = canvas.getContext("2d");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 // Cada estrela começa no centro do brilho da gravura de 1672 × 941.
-const stars = [
-  { note: "dó", frequency: 261.63, path: [[750, 821], [690, 788], [619, 810], [636, 755], [552, 762]] },
-  { note: "ré", frequency: 293.66, path: [
+const paths = [
+  [[750, 821], [690, 788], [619, 810], [636, 755], [552, 762]],
+  [
     [1008, 524], [951, 508], [924, 475], [884, 500], [890, 400], [788, 471],
     [802, 334], [727, 403], [749, 348], [675, 378], [602, 419], [526, 445],
-  ] },
-  { note: "mi", frequency: 329.63, path: [[1001, 357], [971, 329], [908, 352], [926, 299], [850, 310]] },
-  { note: "fá", frequency: 349.23, path: [[1279, 370], [1190, 352], [1145, 383], [1162, 311], [1057, 316]] },
-  { note: "sol", frequency: 392, path: [[1356, 248], [1284, 219], [1238, 246], [1252, 192], [1175, 204]] },
-  { note: "lá", frequency: 440, path: [[1410, 174], [1356, 162], [1317, 182], [1332, 135], [1260, 145]] },
-  { note: "si", frequency: 493.88, path: [[1438, 184], [1502, 169], [1488, 224], [1553, 210], [1526, 267]] },
+  ],
+  [[1001, 357], [971, 329], [908, 352], [926, 299], [850, 310]],
+  [[1279, 370], [1190, 352], [1145, 383], [1162, 311], [1057, 316]],
+  [[1356, 248], [1284, 219], [1238, 246], [1252, 192], [1175, 204]],
+  [[1410, 174], [1356, 162], [1317, 182], [1332, 135], [1260, 145]],
+  [[1438, 184], [1502, 169], [1488, 224], [1553, 210], [1526, 267]],
 ];
 
-let audio;
 let frame;
 let hoveredStar;
 let activeStar;
-
-async function pluck(frequency) {
-  if (!window.AudioContext) return;
-  audio ??= new AudioContext();
-  if (audio.state !== "running") await audio.resume();
-
-  const start = audio.currentTime;
-  const string = audio.createOscillator();
-  const gain = audio.createGain();
-  string.type = "triangle";
-  string.frequency.value = frequency;
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(0.065, start + 0.012);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.75);
-  string.connect(gain).connect(audio.destination);
-  string.onended = () => {
-    string.disconnect();
-    gain.disconnect();
-  };
-  string.start(start);
-  string.stop(start + 0.76);
-}
 
 function drawBolt(path, reach, opacity) {
   ink.clearRect(0, 0, canvas.width, canvas.height);
@@ -81,14 +58,12 @@ function drawBolt(path, reach, opacity) {
   ink.stroke();
 }
 
-function resonate(star, byHover = false) {
+function resonate(star, announce = false) {
   cancelAnimationFrame(frame);
   activeStar?.button.classList.remove("is-active");
   activeStar = star;
   star.button.classList.add("is-active");
-  if (!byHover) status.textContent = `A corda soa em ${star.note}.`;
-  // No primeiro hover, a luz já responde enquanto o navegador aguarda um gesto para liberar o som.
-  if (!byHover || audio?.state === "running") pluck(star.frequency).catch(() => {});
+  if (announce) status.textContent = `Raio da estrela ${star.number} de ${paths.length}.`;
 
   const started = performance.now();
   const still = reducedMotion.matches;
@@ -125,18 +100,20 @@ function nearestStar(event) {
   return nearest;
 }
 
-stars.forEach((star, index) => {
-  const [x, y] = star.path[0];
+const stars = paths.map((path, index) => {
+  const [x, y] = path[0];
+  const number = index + 1;
   const button = document.createElement("button");
   button.className = "star";
   button.type = "button";
-  button.setAttribute("aria-label", `Tocar a estrela em ${star.note}`);
+  button.setAttribute("aria-label", `Acender a estrela ${number} de ${paths.length}`);
   button.style.setProperty("--x", `${100 * x / canvas.width}%`);
   button.style.setProperty("--y", `${100 * y / canvas.height}%`);
   button.style.setProperty("--delay", `${-index * 0.43}s`);
-  button.addEventListener("click", () => resonate(star));
-  star.button = button;
+  const star = { path, button, number };
+  button.addEventListener("click", () => resonate(star, true));
   plate.append(button);
+  return star;
 });
 
 scene.addEventListener("pointermove", event => {
@@ -145,7 +122,7 @@ scene.addEventListener("pointermove", event => {
   if (star === hoveredStar) return;
   hoveredStar = star;
   scene.classList.toggle("is-over-star", Boolean(star));
-  if (star) resonate(star, true);
+  if (star) resonate(star);
 });
 
 scene.addEventListener("pointerleave", () => {
@@ -156,5 +133,5 @@ scene.addEventListener("pointerleave", () => {
 scene.addEventListener("click", event => {
   if (event.target.closest("button")) return;
   const star = nearestStar(event);
-  if (star) resonate(star);
+  if (star) resonate(star, true);
 });
