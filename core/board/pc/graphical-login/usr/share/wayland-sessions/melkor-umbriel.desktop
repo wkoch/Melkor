@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Umbriel
+Exec=/usr/bin/melkor-desktop --umbriel
+Type=Application
+DesktopNames=Umbriel

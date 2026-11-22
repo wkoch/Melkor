@@ -15,7 +15,7 @@ REPO = "https://dl-cdn.alpinelinux.org/alpine/v3.24"
 LOCK = Path(__file__).resolve().parents[1] / "apps/desktop/alpine-3.24.lock"
 DEBIAN_LOCK = LOCK.with_name("debian-13.lock")
 SDK_LOCK = LOCK.with_name("alpine-3.24-sdk.lock")
-GREETER_PATCH = LOCK.parent / "patches" / "gtkgreet-login.patch"
+GREETER_PATCH = LOCK.parent / "patches" / "noctalia-greeter-protocol-headers.patch"
 
 INSTALL = r"""
 mkdir /work/runtime
@@ -51,22 +51,31 @@ apk --no-network --repositories-file /dev/null --no-progress add --force-non-rep
 export TMPDIR=/work
 mkdir -p /usr/include/stb
 for header in /usr/include/stb_*.h; do ln -s "$header" /usr/include/stb/; done
-mkdir /work/src-noctalia /work/src-umbriel /work/src-gtkgreet
+mkdir /work/src-noctalia /work/src-umbriel /work/src-noctalia-greeter
 tar -xzof /packages/noctalia-v5.6.0.tar.gz -C /work/src-noctalia --strip-components=1
 tar -xzof /packages/umbriel.tar.gz -C /work/src-umbriel --strip-components=1
-tar -xzof /packages/gtkgreet-0.8.tar.gz -C /work/src-gtkgreet --strip-components=1
-(cd /work/src-gtkgreet && patch -p1 < /packages/gtkgreet-login.patch)
+tar -xzof /packages/noctalia-greeter-1.7.1.tar.gz -C /work/src-noctalia-greeter --strip-components=1
+(cd /work/src-noctalia-greeter && patch -p1 < /packages/noctalia-greeter-protocol-headers.patch)
 meson setup /work/build-umbriel /work/src-umbriel --prefix=/opt/melkor-desktop/usr \
     --buildtype=release -Dtests=disabled -Djemalloc=disabled -Dlocaled=disabled
 meson setup /work/build-noctalia /work/src-noctalia --prefix=/opt/melkor-desktop/usr \
     --buildtype=release -Dtests=disabled -Djemalloc=disabled
-meson setup /work/build-gtkgreet /work/src-gtkgreet --prefix=/opt/melkor-desktop/usr \
-    --buildtype=release -Dlayershell=disabled -Dman-pages=disabled
-for app in umbriel noctalia gtkgreet; do
+meson setup /work/build-noctalia-greeter /work/src-noctalia-greeter --prefix=/opt/melkor-desktop/usr \
+    --buildtype=release
+for app in umbriel noctalia; do
     meson compile -C "/work/build-$app" -j 6
     meson install -C "/work/build-$app" --destdir /work/stage --no-rebuild
     install -Dm644 "/work/src-$app/LICENSE" "/work/stage/opt/melkor-desktop/usr/share/licenses/$app/LICENSE"
 done
+# O Cage é o compositor da tela de login. Instale o cliente e seus ativos.
+meson compile -C /work/build-noctalia-greeter -j 6 noctalia-greeter
+prefix=/work/stage/opt/melkor-desktop/usr
+greeter=/work/src-noctalia-greeter
+install -Dm755 /work/build-noctalia-greeter/noctalia-greeter "$prefix/bin/noctalia-greeter"
+mkdir -p "$prefix/share/noctalia-greeter"
+cp -a "$greeter/assets" "$prefix/share/noctalia-greeter/"
+install -Dm644 "$greeter/LICENSE" "$prefix/share/licenses/noctalia-greeter/LICENSE"
+install -Dm644 "$greeter/third_party/wuffs/LICENSE-MIT" "$prefix/share/licenses/noctalia-greeter/Wuffs-LICENSE-MIT"
 tar -C /work/stage/opt/melkor-desktop -czf /work/layer.tar.gz usr
 """
 

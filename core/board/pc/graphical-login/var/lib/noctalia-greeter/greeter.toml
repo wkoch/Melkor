@@ -1,0 +1,3 @@
+[appearance]
+# No Melkor, desligar e reiniciar exigem root.
+power_buttons_position = "hidden"

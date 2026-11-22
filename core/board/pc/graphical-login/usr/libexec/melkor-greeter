@@ -1,14 +1,18 @@
 #!/bin/sh
 set -eu
 
+runtime=/opt/melkor-desktop
 umask 077
-runtime=$(mktemp -d /tmp/melkor-greeter.XXXXXX)
-trap 'rm -rf -- "$runtime"' EXIT
-export XDG_RUNTIME_DIR="$runtime"
-export XDG_CACHE_HOME="$runtime"
+scratch=$(mktemp -d /tmp/melkor-greeter.XXXXXX)
+trap 'rm -rf -- "$scratch"' EXIT
+export XDG_RUNTIME_DIR="$scratch"
+export XDG_CACHE_HOME="$scratch"
 export LIBSEAT_BACKEND=seatd
-export LIBINPUT_QUIRKS_DIR=/opt/melkor-desktop/usr/share/libinput
+export LIBINPUT_QUIRKS_DIR="$runtime/usr/share/libinput"
+export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
+export GBM_BACKENDS_PATH="$runtime/usr/lib/gbm"
+export XKB_CONFIG_ROOT="$runtime/usr/share/X11/xkb"
 export WLR_RENDERER=pixman
-export GDK_BACKEND=wayland
 export LANG=C.UTF-8
-/usr/bin/melkor-session-exec cage -s -- /usr/bin/melkor-session-exec gtkgreet -c '/usr/bin/melkor-desktop --umbriel'
+dbus-run-session -- "$runtime/usr/bin/cage" -s -- \
+    "$runtime/usr/bin/noctalia-greeter" --session melkor-umbriel --user melkor

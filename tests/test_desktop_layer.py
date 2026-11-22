@@ -53,8 +53,8 @@ class DesktopLayerTest(unittest.TestCase):
                 self.assertIn("--no-network", args[-1])
                 stage = Path(next(arg for arg in args if arg.endswith(":/work")).removesuffix(":/work"))
                 self.assertEqual((stage / "packages/pacote.apk").read_bytes(), payload)
-                greeter_patch = stage / "packages/gtkgreet-login.patch"
-                if "build-gtkgreet" in args[-1]:
+                greeter_patch = stage / "packages/noctalia-greeter-protocol-headers.patch"
+                if "build-noctalia-greeter" in args[-1]:
                     self.assertEqual(greeter_patch.read_bytes(), LAYER["GREETER_PATCH"].read_bytes())
                 else:
                     self.assertFalse(greeter_patch.exists())

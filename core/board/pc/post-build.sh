@@ -59,19 +59,21 @@ if [ -n "${MELKOR_PC_SESSION_LAYER:-}" ]; then
     test "${MELKOR_PC_MINIMAL:-0}" != 1
     runtime=/opt/melkor-desktop
     tar -xzf "$MELKOR_PC_SESSION_LAYER" -C "$1$runtime"
-    for binary in sbin/greetd sbin/unix_chkpwd bin/cage bin/gtkgreet bin/umbriel; do
+    for binary in sbin/greetd sbin/unix_chkpwd bin/cage bin/noctalia-greeter bin/umbriel; do
         test -x "$1$runtime/usr/$binary"
     done
     # greetd reexecuta o próprio ELF. PAM executa unix_chkpwd pelo caminho de fábrica.
-    for binary in greetd unix_chkpwd; do
+    # O Cage também executa o cliente Noctalia diretamente.
+    for binary in sbin/greetd sbin/unix_chkpwd bin/cage bin/noctalia-greeter; do
         "$HOST_DIR/bin/patchelf" --set-interpreter "$runtime/lib/ld-musl-x86_64.so.1" \
-            --set-rpath "$runtime/lib:$runtime/usr/lib" "$1$runtime/usr/sbin/$binary"
+            --set-rpath "$runtime/lib:$runtime/usr/lib" "$1$runtime/usr/$binary"
     done
     chmod 0700 "$1$runtime/usr/sbin/unix_chkpwd"
     install -d "$1/usr/sbin"
     ln -sf "$runtime/usr/sbin/unix_chkpwd" "$1/usr/sbin/unix_chkpwd"
     login="$(dirname "$0")/graphical-login"
-    for file in etc/dinit.d/graphical-login etc/greetd/config.toml etc/pam.d/greetd etc/pam.d/greetd-greeter; do
+    for file in etc/dinit.d/graphical-login etc/greetd/config.toml etc/pam.d/greetd etc/pam.d/greetd-greeter \
+        usr/share/wayland-sessions/melkor-umbriel.desktop var/lib/noctalia-greeter/greeter.toml; do
         install -D -m 0644 "$login/$file" "$1/$file"
     done
     install -D -m 0755 "$login/usr/libexec/melkor-greeter" "$1/usr/libexec/melkor-greeter"

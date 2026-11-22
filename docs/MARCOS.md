@@ -257,6 +257,14 @@ O Buildroot reconfigurou o alvo PC com `MELKOR_PC_MINIMAL=1`, recompôs a raiz d
 
 `make test` passou com 52 testes Python e cobertura de 80,8% das instruções Go, 92,0% da métrica Python e 97,5% das linhas Shell. Relatórios em `out/coverage/`. A validação física no HP continua pendente.
 
+### Noctalia Greeter na edição desktop
+
+Em 22 de novembro de 2026, `make pc-desktop-layer pc-session-layer` montou as camadas com Podman rootless. `make image BOARD=pc` compilou o core no contêiner Fedora 45. A finalização do Buildroot foi retomada quando a camada de sessão ficou disponível. O gerador de disco precisou de `GCONV_PATH=/usr/lib64/gconv` no contêiner para o mcopy converter a página de código 850. Os três artefatos do core passaram pela conferência de SHA-256.
+
+O comando `make test-pc-desktop OUT=out/pc-noctalia-greeter/core PC_DESKTOP_LOGIN=1 PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_AUDIO=1` verificou no QEMU com KVM e OVMF a recusa de senha incorreta, o login no Noctalia Greeter, o retorno após encerrar Umbriel e a alternância entre login e console de recuperação. Alacritty abriu com Nushell, e Firefox ESR, Brave Origin e Blanc reproduziram áudio na placa HDA virtual. Evidências em `out/pc-noctalia-greeter/core/desktop-tests/desktop-geg2a36_/`.
+
+Em uma imagem de laboratório recomposta, a mesma combinação de Cage e Noctalia Greeter passou com uma senha de 128 bytes e completou onze idas e voltas entre VT1 e VT2 em outro teste. `make test` passou com 81,0% em Go, 92,1% em Python e 97,7% em Shell.
+
 ### Instalação mínima com seleção numérica
 
 `make image BOARD=pc` passou a selecionar o core mínimo quando não há camadas gráficas. O candidato local reutilizou o kernel, o initramfs e a entrada UEFI da ISO mínima assinada. Uma camada cpio inseriu `melkor-instalar` recompilado com o Go do host e o SquashFS base recebeu `melkor-finalizar`. O SquashFS foi reempacotado com `unsquashfs -pf` e `mksquashfs -pf`, com metadados e chaves de confiança conferidos. O xorriso 1.5.8 do Alpine remontou a ISO de teste. O SHA-256 firmado dessa mídia é `ea2b0de13beb7734fcdb8be6b4b2f9be3a2bfb652fc6f81de02940c94f2ac433`.

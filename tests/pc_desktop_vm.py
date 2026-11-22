@@ -47,7 +47,7 @@ def wait_greeter(console):
     guest(console, 'for attempt in $(seq 1 20); do '
           'for process in /proc/[0-9]*; do '
           'grep -Eq "^Uid:[[:space:]]+203[[:space:]]" "$process/status" 2>/dev/null || continue; '
-          'if tr "\\000" " " < "$process/cmdline" | grep -q "/opt/melkor-desktop/usr/bin/gtkgreet -c "; '
+          'if tr "\\000" " " < "$process/cmdline" | grep -q "^/opt/melkor-desktop/usr/bin/noctalia-greeter --session melkor-umbriel --user melkor "; '
           'then exit 0; fi; done; sleep 1; done; ps; exit 1')
 
 
@@ -56,19 +56,10 @@ def start_graphical_login(console, qmp, run, passwords):
     wait_greeter(console)
     time.sleep(2)
     qmp("screendump", filename=str(run / "00-login.ppm"))
-    type_keys(qmp, "melkor\n")
-    time.sleep(0.5)
     type_keys(qmp, "senhaerrada\n")
     time.sleep(3)
     guest(console, 'test -z "$(ls -d /tmp/melkor-wayland.* 2>/dev/null)"')
     qmp("screendump", filename=str(run / "00-login-recusado.ppm"))
-    type_keys(qmp, "root\n")
-    time.sleep(3)
-    guest(console, 'test -z "$(ls -d /tmp/melkor-wayland.* 2>/dev/null)"')
-    qmp("screendump", filename=str(run / "00-root-recusado.ppm"))
-    type_keys(qmp, "melkor\n")
-    time.sleep(0.5)
-    qmp("screendump", filename=str(run / "00-senha.ppm"))
     type_keys(qmp, passwords[0].decode("ascii") + "\n")
 
 

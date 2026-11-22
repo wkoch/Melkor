@@ -1,0 +1,12 @@
+Gera os cabeçalhos Wayland antes de compilar qualquer fonte do greeter.
+Sem a dependência explícita, Ninja pode compilar greeter_window.cpp cedo demais.
+
+--- a/meson.build
++++ b/meson.build
+@@ -96,5 +96,5 @@
+     command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+     depends: _h,
+   )
+-  _protocol_sources += _c
++  _protocol_sources += [_h, _c]
+ endforeach

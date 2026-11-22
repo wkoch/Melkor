@@ -383,6 +383,6 @@ c7359ffa9d0c785c3298300a1daa08b9199799748b40696ce4cd589194b57ab2 main yaml-0.2.5
 774da060da278110a2075de01ecee04fb036033ec19de9f3c36f0283c150a487 main zstd-1.5.7-r2.apk
 1b548f46268e658cdd79fc65eb3e58e627d57d8694c3615f6e9490e6f70ba0cd main zstd-dev-1.5.7-r2.apk
 23c6065b0049b2406441564bcf0032515a43f78e80d76fcb85535a3803ef5d4e main zstd-libs-1.5.7-r2.apk
-e5c70219da191a60e2e009412603e05c36cee15bbbf7657dbbeaa1d21a692873 https://git.sr.ht/~kennylevinsen/gtkgreet/archive/0.8.tar.gz gtkgreet-0.8.tar.gz
 13389cfe443dcb1c0af351b0826df762b08cccabeeea9d6daf7ed1bfb2e7c855 https://github.com/noctalia-dev/noctalia/releases/download/v5.6.0/noctalia-v5.6.0.tar.gz noctalia-v5.6.0.tar.gz
 c7ea5b6fcee7bef31343bfc01377aed7937c4b9ca05503633750fa7452bd4766 https://codeload.github.com/noctalia-dev/umbriel/tar.gz/c634d946b50e7b2540c0d7e108ffa36d7c27adc8 umbriel.tar.gz
+d42775b045a373c610f1fa06ea4eded68d4096d446dfe87ab4b6ce0836c5823d https://codeload.github.com/noctalia-dev/noctalia-greeter/tar.gz/2726e75375d95d5458d021f76c330ab14f6a5d03 noctalia-greeter-1.7.1.tar.gz

@@ -350,13 +350,15 @@ source "$script" "$@"
                         MELKOR_PC_SESSION_LAYER=layer)
         self.assertNotIn("graphical-login", (target / "etc/dinit.d/boot").read_text())
         (weston / "weston.ini").write_text("[core]\n")
-        for name in ("sbin/greetd", "sbin/unix_chkpwd", "bin/cage", "bin/gtkgreet", "bin/umbriel"):
+        greeter_binaries = ("sbin/greetd", "sbin/unix_chkpwd",
+                            "bin/cage", "bin/noctalia-greeter")
+        for name in (*greeter_binaries, "bin/umbriel"):
             binary = payload / "usr" / name
             binary.parent.mkdir(parents=True, exist_ok=True)
             binary.touch(0o755)
         subprocess.run(["tar", "-czf", layer, "-C", payload, "."], check=True)
         patchelf = host / "bin/patchelf"
-        patchelf.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$TEST_BOOT_LOG"\n')
+        patchelf.write_text('#!/bin/sh\nprintf "%s\\n" "$@" >> "$TEST_BOOT_LOG"\n')
         patchelf.chmod(0o755)
         self.run_script(script, target, HOST_DIR=host, MELKOR_PC_DESKTOP_LAYER=layer,
                         MELKOR_PC_CHROMIUM_LAYER=layer, MELKOR_PC_SESSION_LAYER=layer)
@@ -370,18 +372,28 @@ source "$script" "$@"
         service = (target / "etc/dinit.d/graphical-login").read_text()
         self.assertIn("depends-on = persist", service)
         self.assertIn("depends-on = seatd", service)
-        self.assertIn("user = melkor", (target / "etc/pam.d/greetd").read_text())
+        self.assertIn("auth     requisite /opt/melkor-desktop/usr/lib/security/pam_succeed_if.so quiet user = melkor",
+                      (target / "etc/pam.d/greetd").read_text())
+        session = target / "usr/share/wayland-sessions/melkor-umbriel.desktop"
+        self.assertIn("Exec=/usr/bin/melkor-desktop --umbriel", session.read_text())
+        config = target / "var/lib/noctalia-greeter/greeter.toml"
+        self.assertIn('power_buttons_position = "hidden"', config.read_text())
         self.assertEqual(str((target / "usr/sbin/unix_chkpwd").readlink()), "/opt/melkor-desktop/usr/sbin/unix_chkpwd")
         self.assertEqual((target / "opt/melkor-desktop/usr/sbin/unix_chkpwd").stat().st_mode & 0o7777, 0o700)
-        self.assertIn("/opt/melkor-desktop/lib/ld-musl-x86_64.so.1", self.boot_log.read_text())
+        runtime = "/opt/melkor-desktop"
+        calls = self.boot_log.read_text().splitlines()
+        self.assertEqual(calls.count(runtime + "/lib/ld-musl-x86_64.so.1"), len(greeter_binaries))
+        for name in greeter_binaries:
+            self.assertIn(str(target) + runtime + "/usr/" + name, calls)
 
     def test_greeter_usa_runtime_privado_e_abre_apenas_umbriel(self):
         wrapper = self.wrapper("greeter", '''
 mktemp() { command mktemp -d "$TEST_GREETER/XXXXXX"; }
-function /usr/bin/melkor-session-exec() {
+dbus-run-session() {
     test "$(stat -c %a "$XDG_RUNTIME_DIR")" = 700
     test "$XDG_RUNTIME_DIR" = "$XDG_CACHE_HOME"
-    test "$LIBSEAT_BACKEND:$WLR_RENDERER:$GDK_BACKEND" = seatd:pixman:wayland
+    test "$LIBSEAT_BACKEND:$WLR_RENDERER" = seatd:pixman
+    test "$XKB_CONFIG_ROOT" = /opt/melkor-desktop/usr/share/X11/xkb
     printf '%s\\n' "$@" > "$TEST_BOOT_LOG"
     return "$TEST_GREETER_STATUS"
 }
@@ -391,8 +403,8 @@ source "$1"
         for status in (0, 1):
             self.run_script(wrapper, script, code=status, TEST_GREETER=self.out, TEST_GREETER_STATUS=str(status))
             self.assertEqual(self.boot_log.read_text().splitlines(), [
-                "cage", "-s", "--", "/usr/bin/melkor-session-exec", "gtkgreet",
-                "-c", "/usr/bin/melkor-desktop --umbriel",
+                "--", "/opt/melkor-desktop/usr/bin/cage", "-s", "--",
+                "/opt/melkor-desktop/usr/bin/noctalia-greeter", "--session", "melkor-umbriel", "--user", "melkor",
             ])
             self.assertEqual(list(self.out.iterdir()), [self.downloads])
 
