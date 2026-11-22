@@ -1,0 +1,224 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #151019;
+  color: #fff1dc;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+
+.hero {
+  --paper: #fff1dc;
+  --muted: #e0cbbb;
+  --copper: #f4b477;
+  --shadow: #151019;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.story {
+  position: relative;
+  z-index: 1;
+  width: min(37%, 40rem);
+  margin-inline-start: clamp(2.75rem, 6.25vw, 8rem);
+  padding-block: 4rem;
+}
+
+h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(4rem, 7.35vw, 7.75rem);
+  font-weight: normal;
+  letter-spacing: -0.068em;
+  line-height: 0.94;
+  text-wrap: balance;
+}
+
+.verse {
+  max-width: 26rem;
+  margin: 1.6rem 0 1.15rem;
+  color: var(--copper);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.28rem, 2.1vw, 1.8rem);
+  line-height: 1.32;
+  text-wrap: pretty;
+}
+
+.description {
+  max-width: 23rem;
+  margin: 0 0 1.4rem;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 1.1rem;
+  row-gap: 0.35rem;
+}
+
+a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--paper);
+  font-size: 0.925rem;
+  text-decoration-color: #bd9b85;
+  text-underline-offset: 0.25em;
+}
+
+a:hover { text-decoration-color: currentColor; }
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 4px;
+}
+
+.download {
+  padding: 0.65rem 1rem;
+  border-radius: 0.25rem;
+  background: var(--copper);
+  color: #26151b;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.download:hover { background: #ffd1a0; }
+
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.plate {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: max(100%, calc(100svh * 1672 / 941));
+  aspect-ratio: 1672 / 941;
+  translate: 0 -50%;
+}
+
+.plate img,
+.resonance {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, #151019 0%, #151019f5 17%, #151019d6 32%, #15101927 54%, transparent 68%);
+}
+
+.pluck {
+  position: absolute;
+  z-index: 1;
+  top: 55.7%;
+  left: 60.4%;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid #ffe4bdcc;
+  border-radius: 50%;
+  background: #28161875;
+  color: #fff1dc;
+  cursor: pointer;
+}
+
+.pluck-mark {
+  width: 0.43rem;
+  height: 0.43rem;
+  border-radius: 50%;
+  background: #fff1dc;
+  box-shadow: 0 0 0.85rem #ffc689;
+}
+
+.pluck-label {
+  position: absolute;
+  inset-block-start: calc(100% + 0.45rem);
+  width: max-content;
+  padding: 0.36rem 0.63rem;
+  border-radius: 0.2rem;
+  background: #251720;
+  color: #fff1dc;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.pluck:hover { background: #6e3a22c9; }
+.resonance { pointer-events: none; }
+
+.status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+@media (max-width: 960px), (max-aspect-ratio: 6/5) {
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: auto;
+  }
+
+  .story {
+    width: auto;
+    margin: 0;
+    padding: 3rem clamp(1.4rem, 6vw, 3.5rem) 1.2rem;
+  }
+
+  h1 { font-size: clamp(3.15rem, 10vw, 5.5rem); }
+
+  .scene {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: clamp(295px, 65vw, 420px);
+  }
+
+  .plate { width: max(100%, clamp(535px, 108vw, 830px)); }
+
+  .scene::after {
+    background: linear-gradient(180deg, #151019 0%, #15101945 13%, transparent 33%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-enter] { animation: entrar 480ms ease-out both; }
+
+  .download, .pluck {
+    transition: background-color 150ms ease, transform 150ms ease;
+  }
+
+  .download:hover, .pluck:hover { transform: translateY(-2px); }
+  .download:active, .pluck:active { transform: translateY(1px); }
+
+  @keyframes entrar {
+    from { opacity: 0; transform: translateY(0.5rem); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
