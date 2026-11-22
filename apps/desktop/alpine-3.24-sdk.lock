@@ -357,7 +357,7 @@ a728f7103217cafdc83ff6ad0d679c197dbbe280bd5788c8336259f7a39cb303 main wayland-li
 16ec369226507abaeb84b496ce2bb1a4ef29987ea91ba6bedc40bb0e0af274e7 main wayland-libs-cursor-1.25.0-r0.apk
 c944a59c91ce89972b4cf0ecbb46dfcd43f95c4b86ee63b5522b9a843a3d6af9 main wayland-libs-egl-1.25.0-r0.apk
 044d9f2386d312ae6431599b733e2f8118325b5936844f7b4174e9140fa33d16 main wayland-libs-server-1.25.0-r0.apk
-165c007c1bc144fb5b16a1b115c34e495d73f951d28603b626de842fedce6c57 main wayland-protocols-1.48-r0.apk
+90fc371d863cee16a24a3d9e73d3680399ebb677d16b20dac2287362747608a7 https://dl-cdn.alpinelinux.org/alpine/edge/main/x86_64/wayland-protocols-1.49-r0.apk wayland-protocols-1.49-r0.apk
 635760ae071bcb6eb785ccd749dd65aa64caf4373143a3bdef2ca968f252a4ae community webrtc-audio-processing-2-2.1-r1.apk
 bba76aaa8b5949e973d071432dd9096a4a93fb9365b360cca95807709531d654 community wireplumber-dev-0.5.15-r0.apk
 922c8526dc3c0b6192de633e19afa924fe4a944b6e62dc3de6813fdc74cfd632 community wireplumber-libs-0.5.15-r0.apk
@@ -386,3 +386,9 @@ c7359ffa9d0c785c3298300a1daa08b9199799748b40696ce4cd589194b57ab2 main yaml-0.2.5
 13389cfe443dcb1c0af351b0826df762b08cccabeeea9d6daf7ed1bfb2e7c855 https://github.com/noctalia-dev/noctalia/releases/download/v5.6.0/noctalia-v5.6.0.tar.gz noctalia-v5.6.0.tar.gz
 c7ea5b6fcee7bef31343bfc01377aed7937c4b9ca05503633750fa7452bd4766 https://codeload.github.com/noctalia-dev/umbriel/tar.gz/c634d946b50e7b2540c0d7e108ffa36d7c27adc8 umbriel.tar.gz
 d42775b045a373c610f1fa06ea4eded68d4096d446dfe87ab4b6ce0836c5823d https://codeload.github.com/noctalia-dev/noctalia-greeter/tar.gz/2726e75375d95d5458d021f76c330ab14f6a5d03 noctalia-greeter-1.7.1.tar.gz
+20dac639d1730db33a79c3d392d6f2598e2a9cc6f119932090b8bae940911039 main acl-dev-2.3.2-r1.apk
+3f02851d586c25d97ba8b5b845615aacc209ae7eaeb6f7843eca76d85da2249d main acl-libs-2.3.2-r1.apk
+275ca3b65a540656c91f776a7e0f3ceee5240982218d16b6acba7d040f765599 main libarchive-3.8.11-r0.apk
+b101d3185a32a3aa386f688cea5efc78078b58c25f54dd1185e32e6a7c1baaa3 main libarchive-dev-3.8.11-r0.apk
+3ad4912ab8ecf5f6236fdb751f88243006b3a8f152684e455b781e16284dd298 main lz4-libs-1.10.0-r1.apk
+c19c3e0ebd4712c13e92167206aa3eb4d2a11a7d19277779527e11a7583916df https://codeload.github.com/noctalia-dev/luciole/tar.gz/bae75c541ce1d863438d013f1f157b0db85e87df luciole-bae75c5.tar.gz

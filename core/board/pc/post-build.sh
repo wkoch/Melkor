@@ -59,12 +59,12 @@ if [ -n "${MELKOR_PC_SESSION_LAYER:-}" ]; then
     test "${MELKOR_PC_MINIMAL:-0}" != 1
     runtime=/opt/melkor-desktop
     tar -xzf "$MELKOR_PC_SESSION_LAYER" -C "$1$runtime"
-    for binary in sbin/greetd sbin/unix_chkpwd bin/cage bin/noctalia-greeter bin/umbriel; do
+    for binary in sbin/greetd sbin/unix_chkpwd bin/cage bin/noctalia-greeter bin/umbriel bin/luciole; do
         test -x "$1$runtime/usr/$binary"
     done
     # greetd reexecuta o próprio ELF. PAM executa unix_chkpwd pelo caminho de fábrica.
     # O Cage também executa o cliente Noctalia diretamente.
-    for binary in sbin/greetd sbin/unix_chkpwd bin/cage bin/noctalia-greeter; do
+    for binary in sbin/greetd sbin/unix_chkpwd bin/cage bin/noctalia-greeter bin/luciole; do
         "$HOST_DIR/bin/patchelf" --set-interpreter "$runtime/lib/ld-musl-x86_64.so.1" \
             --set-rpath "$runtime/lib:$runtime/usr/lib" "$1$runtime/usr/$binary"
     done
@@ -76,7 +76,20 @@ if [ -n "${MELKOR_PC_SESSION_LAYER:-}" ]; then
         usr/share/wayland-sessions/melkor-umbriel.desktop var/lib/noctalia-greeter/greeter.toml; do
         install -D -m 0644 "$login/$file" "$1/$file"
     done
-    install -D -m 0755 "$login/usr/libexec/melkor-greeter" "$1/usr/libexec/melkor-greeter"
+    for executable in usr/libexec/melkor-greeter usr/libexec/melkor-start-noctalia usr/bin/luciole; do
+        install -D -m 0755 "$login/$executable" "$1/$executable"
+    done
+    for file in applications/dev.noctalia.luciole.desktop icons/hicolor/scalable/apps/dev.noctalia.luciole.svg \
+        xdg-desktop-portal/portals/luciole.portal; do
+        install -D -m 0644 "$1$runtime/usr/share/$file" "$1/usr/share/$file"
+    done
+    services="$1/usr/share/dbus-1/services"
+    install -d "$services"
+    for service in dev.noctalia.luciole.FileManager1 org.freedesktop.impl.portal.desktop.luciole; do
+        sed "s|^Exec=$runtime/usr/bin/luciole |Exec=/usr/bin/luciole |" \
+            "$1$runtime/usr/share/dbus-1/services/$service.service" > "$services/$service.service"
+    done
+    printf '%s\n' 'inode/directory=dev.noctalia.luciole.desktop;' >> "$1/usr/share/applications/mimeapps.list"
     sed -i 's/tty1 linux/tty2 linux/' "$1/etc/dinit.d/console-local"
     printf '%s\n' 'waits-for = graphical-login' >> "$1/etc/dinit.d/boot"
     printf '%s\n' 'Melkor Linux PC. Use Ctrl+Alt+F1 para voltar ao login gráfico.' > "$1/etc/motd"

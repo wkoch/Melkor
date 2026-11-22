@@ -1,9 +1,10 @@
 [general]
 xwayland = false
-autostart = ["/usr/bin/melkor-session-exec noctalia"]
+autostart = ["/usr/libexec/melkor-start-noctalia"]
 
 [input.keyboard]
 layout = "br"
 
 [keybinds]
 "Mod+Return" = "spawn /usr/bin/melkor-terminal"
+"Mod+e" = "spawn /usr/bin/luciole"

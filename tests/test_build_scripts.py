@@ -351,11 +351,22 @@ source "$script" "$@"
         self.assertNotIn("graphical-login", (target / "etc/dinit.d/boot").read_text())
         (weston / "weston.ini").write_text("[core]\n")
         greeter_binaries = ("sbin/greetd", "sbin/unix_chkpwd",
-                            "bin/cage", "bin/noctalia-greeter")
+                            "bin/cage", "bin/noctalia-greeter", "bin/luciole")
         for name in (*greeter_binaries, "bin/umbriel"):
             binary = payload / "usr" / name
             binary.parent.mkdir(parents=True, exist_ok=True)
             binary.touch(0o755)
+        for path in ("applications/dev.noctalia.luciole.desktop",
+                     "icons/hicolor/scalable/apps/dev.noctalia.luciole.svg",
+                     "xdg-desktop-portal/portals/luciole.portal"):
+            asset = payload / "usr/share" / path
+            asset.parent.mkdir(parents=True, exist_ok=True)
+            asset.touch()
+        services = payload / "usr/share/dbus-1/services"
+        services.mkdir(parents=True)
+        for name, option in (("dev.noctalia.luciole.FileManager1", "--file-manager-service"),
+                             ("org.freedesktop.impl.portal.desktop.luciole", "--file-chooser-service")):
+            (services / f"{name}.service").write_text(f"Exec=/opt/melkor-desktop/usr/bin/luciole {option}\n")
         subprocess.run(["tar", "-czf", layer, "-C", payload, "."], check=True)
         patchelf = host / "bin/patchelf"
         patchelf.write_text('#!/bin/sh\nprintf "%s\\n" "$@" >> "$TEST_BOOT_LOG"\n')
@@ -376,6 +387,10 @@ source "$script" "$@"
                       (target / "etc/pam.d/greetd").read_text())
         session = target / "usr/share/wayland-sessions/melkor-umbriel.desktop"
         self.assertIn("Exec=/usr/bin/melkor-desktop --umbriel", session.read_text())
+        self.assertIn("inode/directory=dev.noctalia.luciole.desktop;",
+                      (target / "usr/share/applications/mimeapps.list").read_text())
+        activation = target / "usr/share/dbus-1/services/dev.noctalia.luciole.FileManager1.service"
+        self.assertEqual(activation.read_text(), "Exec=/usr/bin/luciole --file-manager-service\n")
         config = target / "var/lib/noctalia-greeter/greeter.toml"
         self.assertIn('power_buttons_position = "hidden"', config.read_text())
         self.assertEqual(str((target / "usr/sbin/unix_chkpwd").readlink()), "/opt/melkor-desktop/usr/sbin/unix_chkpwd")
@@ -407,6 +422,27 @@ source "$1"
                 "/opt/melkor-desktop/usr/bin/noctalia-greeter", "--session", "melkor-umbriel", "--user", "melkor",
             ])
             self.assertEqual(list(self.out.iterdir()), [self.downloads])
+
+    def test_luciole_usa_runtime_e_noctalia_publica_ambiente_do_wayland(self):
+        wrapper = self.wrapper("luciole", """
+exec() { "$@"; exit $?; }
+function /opt/melkor-desktop/usr/bin/luciole() {
+    test "$LIBGL_DRIVERS_PATH" = /opt/melkor-desktop/usr/lib/dri
+    test "$GBM_BACKENDS_PATH" = /opt/melkor-desktop/usr/lib/gbm
+    printf '%s\\n' "$@" > "$TEST_BOOT_LOG"
+}
+dbus-update-activation-environment() { printf '%s\\n' "$@" > "$TEST_BOOT_LOG"; }
+function /usr/bin/melkor-session-exec() { printf '%s\\n' "$@" >> "$TEST_BOOT_LOG"; }
+script=$1
+shift
+source "$script" "$@"
+""")
+        login = self.project / "core/board/pc/graphical-login"
+        self.run_script(wrapper, login / "usr/bin/luciole", "--file-manager-service")
+        self.assertEqual(self.boot_log.read_text(), "--file-manager-service\n")
+        self.run_script(wrapper, login / "usr/libexec/melkor-start-noctalia")
+        self.assertEqual(self.boot_log.read_text().splitlines(),
+                         ["WAYLAND_DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "noctalia"])
 
     def test_finaliza_pc_com_midia_somente_leitura_e_limpa_area_temporaria(self):
         wrapper = self.wrapper("finalizar", '''

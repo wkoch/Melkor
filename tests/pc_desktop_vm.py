@@ -107,6 +107,8 @@ def desktop(console, qmp, run, apps, chromium, umbriel, audio, graphical, passwo
         if audio:
             test_audio_policy(console)
         if apps:
+            if graphical:
+                test_luciole(console, qmp, run)
             test_firefox(console, qmp, run, audio)
         if chromium:
             test_chromium(console, qmp, run, audio)
@@ -126,6 +128,25 @@ def desktop(console, qmp, run, apps, chromium, umbriel, audio, graphical, passwo
     finally:
         with suppress(RuntimeError):
             qmp("screendump", filename=str(run / "tela-final.ppm"))
+
+
+def test_luciole(console, qmp, run):
+    guest(console, "LC_ALL=C gio mime inode/directory | head -n 1 | "
+          "grep -F 'dev.noctalia.luciole.desktop'")
+    press(qmp, "meta_l", "e")
+    guest(console, 'for attempt in $(seq 1 15); do pid=$(pidof -s luciole) && '
+          'grep -Eq "^Uid:[[:space:]]+1000[[:space:]]" "/proc/$pid/status" && exit 0; '
+          'sleep 1; done; ps; exit 1')
+    guest(console, 'pid=$(pidof -s luciole); '
+          'bus=$(tr "\\000" "\\n" <"/proc/$pid/environ" | sed -n "s/^DBUS_SESSION_BUS_ADDRESS=//p"); '
+          'test -n "$bus" && '
+          'dbus-send --bus="$bus" --print-reply --dest=org.freedesktop.FileManager1 '
+          '/org/freedesktop/FileManager1 org.freedesktop.FileManager1.ShowFolders '
+          'array:string:file:///home/melkor string: && '
+          'dbus-send --bus="$bus" --print-reply --dest=org.freedesktop.impl.portal.desktop.luciole '
+          '/org/freedesktop/portal/desktop org.freedesktop.DBus.Introspectable.Introspect '
+          '| grep -F "org.freedesktop.impl.portal.FileChooser"')
+    qmp("screendump", filename=str(run / "03-luciole.ppm"))
 
 
 def test_audio_policy(console):
@@ -324,6 +345,8 @@ def main():
     umbriel = args.umbriel or args.graphical_login
     run_test(args.image, run, args.apps, args.chromium, umbriel, args.audio, args.graphical_login)
     tested = "Alacritty com Nushell e Firefox ESR" if args.apps else "foot"
+    if args.graphical_login and args.apps:
+        tested += ", Luciole via atalho e D-Bus"
     if args.chromium:
         tested += ", Brave Origin e Blanc"
     session = "Umbriel com Noctalia" if umbriel else "Weston"

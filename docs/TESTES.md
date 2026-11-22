@@ -115,6 +115,9 @@ O executor aciona o terminal e executa a expressão `[1 2 3] | math sum` com Nus
 
 O runtime usa os APKs do Cage 0.3.0-r0 e do greetd 0.10.3-r11 do Alpine 3.24. O SDK descartável compila o cliente Wayland do Noctalia Greeter 1.7.1 com os APKs fixados no lock. O patch do Melkor declara os cabeçalhos gerados dos protocolos Wayland como dependências explícitas do cliente. A camada de sessão distribui o cliente do greeter e seus ativos. O patchelf do Buildroot ajusta os interpretadores do greeter, do Cage, do greetd e do auxiliar `unix_chkpwd` do Linux-PAM. Somente root pode executar o auxiliar no sistema instalado. [Noctalia Greeter 1.7.1](https://github.com/noctalia-dev/noctalia-greeter/releases/tag/v1.7.1)
 
+A camada de sessão também compila o Luciole 0.1.0, fixado no commit `bae75c541ce1d863438d013f1f157b0db85e87df`. O SDK usa o APK de `wayland-protocols` 1.49 para obter os XMLs na compilação. O aplicativo usa libarchive, libacl e LZ4 do runtime Alpine. Em modo gráfico com aplicativos, o executor verifica a associação `inode/directory`, aciona `Super+E`, confere o UID e verifica a ativação dos serviços `FileManager1` e `FileChooser` pelo D-Bus. O último teste consulta o backend do Luciole. O frontend dos portais e o GVfs exigem integração própria. [Empacotamento do Luciole](https://github.com/noctalia-dev/luciole/blob/bae75c541ce1d863438d013f1f157b0db85e87df/PACKAGING.md)
+
+
 ## Download HTTPS de atualizações do PC
 
 Use um build `BOARD=pc` com o certificado público descartável em `MELKOR_RAUC_KEYRING`. Gere o disco virtual no mesmo `OUT` passando `PC_CREDENTIALS` com os hashes da senha descartável de root e da conta comum. O teste requer Python 3.11+, QEMU, OVMF, OpenSSL e `mke2fs`.

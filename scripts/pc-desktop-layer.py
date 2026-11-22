@@ -51,18 +51,21 @@ apk --no-network --repositories-file /dev/null --no-progress add --force-non-rep
 export TMPDIR=/work
 mkdir -p /usr/include/stb
 for header in /usr/include/stb_*.h; do ln -s "$header" /usr/include/stb/; done
-mkdir /work/src-noctalia /work/src-umbriel /work/src-noctalia-greeter
+mkdir /work/src-noctalia /work/src-umbriel /work/src-noctalia-greeter /work/src-luciole
 tar -xzof /packages/noctalia-v5.6.0.tar.gz -C /work/src-noctalia --strip-components=1
 tar -xzof /packages/umbriel.tar.gz -C /work/src-umbriel --strip-components=1
 tar -xzof /packages/noctalia-greeter-1.7.1.tar.gz -C /work/src-noctalia-greeter --strip-components=1
 (cd /work/src-noctalia-greeter && patch -p1 < /packages/noctalia-greeter-protocol-headers.patch)
+tar -xzof /packages/luciole-bae75c5.tar.gz -C /work/src-luciole --strip-components=1
 meson setup /work/build-umbriel /work/src-umbriel --prefix=/opt/melkor-desktop/usr \
     --buildtype=release -Dtests=disabled -Djemalloc=disabled -Dlocaled=disabled
 meson setup /work/build-noctalia /work/src-noctalia --prefix=/opt/melkor-desktop/usr \
     --buildtype=release -Dtests=disabled -Djemalloc=disabled
 meson setup /work/build-noctalia-greeter /work/src-noctalia-greeter --prefix=/opt/melkor-desktop/usr \
     --buildtype=release
-for app in umbriel noctalia; do
+meson setup /work/build-luciole /work/src-luciole --prefix=/opt/melkor-desktop/usr \
+    --buildtype=release -Dtests=disabled -Dbuild_revision=bae75c541ce1d863438d013f1f157b0db85e87df
+for app in umbriel noctalia luciole; do
     meson compile -C "/work/build-$app" -j 6
     meson install -C "/work/build-$app" --destdir /work/stage --no-rebuild
     install -Dm644 "/work/src-$app/LICENSE" "/work/stage/opt/melkor-desktop/usr/share/licenses/$app/LICENSE"

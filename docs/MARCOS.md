@@ -265,6 +265,14 @@ O comando `make test-pc-desktop OUT=out/pc-noctalia-greeter/core PC_DESKTOP_LOGI
 
 Em uma imagem de laboratório recomposta, a mesma combinação de Cage e Noctalia Greeter passou com uma senha de 128 bytes e completou onze idas e voltas entre VT1 e VT2 em outro teste. `make test` passou com 81,0% em Go, 92,1% em Python e 97,7% em Shell.
 
+### Luciole na edição desktop
+
+Em 22 de novembro de 2026, `make pc-desktop-layer pc-session-layer` montou o runtime e compilou os quatro componentes do Noctalia em Podman rootless. O Buildroot recompôs o SquashFS com a toolchain do PC já validada. `make pc-disk OUT=out/pc-noctalia-luciole/core` com `GCONV_PATH=/usr/lib64/gconv` no contêiner gerou o disco de laboratório.
+
+`make test-pc-desktop OUT=out/pc-noctalia-luciole/core PC_DESKTOP_LOGIN=1 PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_AUDIO=1` passou em QEMU com OVMF e KVM. O executor confirmou o login, Umbriel e Noctalia Shell, a abertura de Luciole por `Super+E`, o MIME de diretórios, `FileManager1.ShowFolders` e a ativação do backend `FileChooser`. Também verificou o terminal, os três navegadores, o áudio e o retorno do greeter. Evidências em `out/pc-noctalia-luciole/core/desktop-tests/desktop-_g0phblz/`. `make test` passou com 81,0% em Go, 92,1% em Python e 97,8% em Shell.
+
+Uma sondagem separada no disco virtual consultou `/sys/power/state` e `/sys/power/mem_sleep`, escolheu `deep` e escreveu `mem` como root. O QMP confirmou o estado suspenso e aceitou `system_wakeup`. O convidado manteve a tela preta e o console serial não confirmou a retomada no prazo do executor. O acionamento automático pela tampa e a hibernação continuam pendentes. Registros em `out/pc-noctalia-luciole/probe-suspend-retry.log`.
+
 ### Instalação mínima com seleção numérica
 
 `make image BOARD=pc` passou a selecionar o core mínimo quando não há camadas gráficas. O candidato local reutilizou o kernel, o initramfs e a entrada UEFI da ISO mínima assinada. Uma camada cpio inseriu `melkor-instalar` recompilado com o Go do host e o SquashFS base recebeu `melkor-finalizar`. O SquashFS foi reempacotado com `unsquashfs -pf` e `mksquashfs -pf`, com metadados e chaves de confiança conferidos. O xorriso 1.5.8 do Alpine remontou a ISO de teste. O SHA-256 firmado dessa mídia é `ea2b0de13beb7734fcdb8be6b4b2f9be3a2bfb652fc6f81de02940c94f2ac433`.

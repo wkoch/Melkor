@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+runtime=/opt/melkor-desktop
+export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
+export GBM_BACKENDS_PATH="$runtime/usr/lib/gbm"
+exec "$runtime/usr/bin/luciole" "$@"
