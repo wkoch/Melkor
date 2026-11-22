@@ -12,11 +12,13 @@ out/test-venv/bin/python -m pip install --require-hashes --only-binary=:all: -r 
 make test TEST_PYTHON=out/test-venv/bin/python
 ```
 
-Use `KCOV=/caminho/do/kcov` se o executável estiver fora do `PATH`. A suíte e a integração contínua exigem ao menos 80% das instruções Go em `apps/`, 80% na métrica de instruções e ramos dos verificadores Python em `scripts/` e 80% das linhas instrumentadas de cada script Shell próprio em `scripts/` e `core/`. Os relatórios ficam em `out/coverage/test-*/`. As fontes de terceiros e as configurações declarativas ficam fora da métrica. O boot UEFI e a leitura da GPT são exercitados pelos testes de integração.
+Use `KCOV=/caminho/do/kcov` se o executável estiver fora do `PATH`. No Bazzite, o kcov do RPM Fedora 45 pode ser extraído para `out/host-tools/` com `rpm2cpio`, porque o host é imutável. Não use o kcov do contêiner `melkor-build` por meio de `distrobox enter`: os testes de shell criam arquivos em `/tmp` e chamam `podman`, e o contêiner enxerga outro ambiente. A suíte e a integração contínua exigem ao menos 80% das instruções Go em `apps/`, 80% na métrica de instruções e ramos dos verificadores Python em `scripts/` e 80% das linhas instrumentadas de cada script Shell próprio em `scripts/` e `core/`. Os relatórios ficam em `out/coverage/test-*/`. As fontes de terceiros e as configurações declarativas ficam fora da métrica. O boot UEFI e a leitura da GPT são exercitados pelos testes de integração.
 
 Os casos de maior risco verificam downloads HTTPS e rejeitam redirecionamento para HTTP, fonte com hash divergente e resposta acima do limite de 512 MiB. O preparo do Buildroot confere o commit antes de publicar o bundle ou executar suas receitas. Também exercitamos rejeição de artefato, perfil concorrente, falta de espaço simulada, preservação da geração ativa e imagens com partições ou slots incorretos. Os testes locais usam fontes e perfis temporários. Os testes de boot operam sobre discos virtuais.
 
 Em 20 de novembro de 2026, `make test` passou no Bazzite com 85,9% em Go, 95,0% em Python e 95,7% em Shell. Relatórios em `out/coverage/test-z0s8sadd/`. A compilação real de `melkor instalar nushell` passou com Podman rootless. Uma segunda execução, com `melkor atualizar` e um SHA-256 divergente no catálogo de teste, rejeitou a fonte antes da extração e preservou a geração e o binário ativos. Logs em `out/nushell-cobertura.UGhjQr/`.
+
+Em 22 de novembro de 2026, `make test TEST_PYTHON=out/test-venv/bin/python KCOV=$PWD/out/host-tools/kcov` passou no Bazzite, com kcov 43 extraído do RPM Fedora 45 e `coverage.py` 7.17.3 no ambiente virtual do projeto. Resultado: 80,7% em Go (1523/1888 instruções), 91,8% em Python e 97,7% em Shell. Relatórios em `out/coverage/test-*/`. Os 56 testes Python passaram sem o wrapper kcov, e a suíte completa também passou com ele.
 
 | Caso | Ação | Resultado observável |
 | --- | --- | --- |
@@ -80,9 +82,11 @@ O executor monta uma camada de initramfs descartável com dois rádios e inicia 
 
 ## Instalação de disco inteiro
 
-Use `make check-env BOARD=installer` para conferir o cache. As entradas de build para saídas novas são `make image BOARD=pc OUT=out/pc` e `make image BOARD=installer OUT=out/installer`. Com os dois builds disponíveis, `make installer-iso PC_OUT=out/pc OUT=out/installer` usa o GRUB e o xorriso do build do instalador, além de `cpio` e `mkfs.vfat` do contêiner.
+Use `make check-env BOARD=installer` para conferir o cache. As entradas de build para saídas novas são `make image BOARD=pc OUT=out/pc` e `make image BOARD=installer OUT=out/installer`. Com os dois builds disponíveis, `make installer-iso PC_OUT=out/pc OUT=out/installer` usa o Limine, o xorriso e Mtools do build da mídia, além de `cpio` e `mkfs.vfat` do contêiner. O executável Limine do disco vem do build PC.
 
-`make test-installer OUT=out/installer` cria dois arquivos NVMe descartáveis e inicia a ISO como CD em QEMU/OVMF. O teste escolhe o disco pelo número, verifica a recusa de uma confirmação errada antes de gravar, fornece senhas descartáveis, confere a GPT completa e reinicia a VM sem a mídia por A e por B. O SHA-256 de todo o disco vizinho é comparado antes e depois. `TEST_SECTOR_SIZE=4096` usa um NVMe 4Kn e requer uma versão de `sfdisk` com `--sector-size` no host de teste.
+`make test-installer OUT=out/installer` cria dois arquivos NVMe descartáveis e inicia a ISO como CD em QEMU/OVMF. O teste digita `instalar core`, escolhe o disco pelo número, verifica a recusa de uma confirmação errada antes de gravar, fornece senhas descartáveis, confere a GPT completa e reinicia a VM sem a mídia por A e por B. O SHA-256 de todo o disco vizinho é comparado antes e depois. `TEST_SECTOR_SIZE=4096` usa um NVMe 4Kn e requer uma versão de `sfdisk` com `--sector-size` no host de teste.
+
+Com a rede desligada na VM, o teste também exercita `instalar pacote noctalia` e `atualizar` na conta comum, envia a senha de root e verifica a tentativa de abrir o canal assinado. Depois da falha esperada na etapa de sistema, a etapa de aplicativos de `atualizar` cria o perfil com a propriedade da conta comum. Os testes de Shell verificam a escolha do canal em cada perfil e os códigos de saída das duas etapas.
 
 Para o teste em duas etapas, use `make test-installer OUT=out/installer PC_DESKTOP_BUNDLE=/caminho/melkor-desktop.raucb`. O executor usa `mkfs.vfat` e `mcopy` para preparar um segundo arquivo de mídia descartável. Ele confere que a base iniciou sem greeter, executa `melkor-finalizar` como root e verifica o login gráfico com a senha criada no instalador. Use a opção `PC_DESKTOP_LOGIN=1` ao testar diretamente uma ISO completa.
 
@@ -90,7 +94,7 @@ Para a variante Ventoy, use `python3 tests/installer_vm.py ISO --log-dir DIRETÓ
 
 ## Protótipo de disco PC
 
-Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` para gerar um arquivo regular com GPT e 16 GiB lógicos. O gerador exige Go no host, além de `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools` e `grub-editenv`. Os testes unitários exercitam os limites do particionamento, a validação do SquashFS e a preservação de arquivos preexistentes. `make test-pc-disk` usa uma cópia de trabalho com QEMU e OVMF. Ele confirma boot UEFI pelos dois slots no mesmo NVMe virtual, o conteúdo do home e a ativação do swap de 4 GiB. Para testar Weston com `make test-pc-desktop`, gere o core do laboratório com `MELKOR_PC_MINIMAL=0` e use outra cópia do disco.
+Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` para gerar um arquivo regular com GPT e 16 GiB lógicos. O gerador exige Go no host, além de `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools` e `unsquashfs`. Os testes unitários exercitam os limites do particionamento, a validação do SquashFS e a preservação de arquivos preexistentes. `make test-pc-disk` usa uma cópia de trabalho com QEMU e OVMF. Ele confirma boot UEFI pelos dois slots no mesmo NVMe virtual, o conteúdo do home e a ativação do swap de 4 GiB. Para testar Weston com `make test-pc-desktop`, gere o core do laboratório com `MELKOR_PC_MINIMAL=0` e use outra cópia do disco.
 
 Para testar o RAUC nesse disco, use o procedimento de credenciais descartáveis descrito para o M1 e troque o alvo de build para `BOARD=pc`. Execute `make pc-disk` com o mesmo `OUT`, `make bundle-pc` com o certificado desse laboratório e `make test-update BOARD=pc` com o mesmo certificado, a chave e o arquivo da senha de root. A diferença de identificador RAUC entre PC e M1 também é um caso de rejeição.
 
@@ -127,7 +131,7 @@ make test-update-https OUT=out/pc-https CERT="$lab/cert.pem" KEY="$lab/key.pem" 
     ROOT_PASSWORD_FILE="$lab/senha-root"
 ```
 
-O executor abre um servidor TLS em loopback e usa uma cópia do disco com rede virtual. O caso de assinatura adulterada usa o SHA-256 do arquivo adulterado para verificar a rejeição pelo RAUC mesmo após validar o download. O teste confere que certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida preservam a ordem do GRUB e o slot inativo. O bundle válido promove B. O segundo boot confirma B e lê o documento salvo em A. Os logs seriais ficam em `OUT/https-tests/`.
+O executor abre um servidor TLS em loopback e usa uma cópia do disco com rede virtual. O caso de assinatura adulterada usa o SHA-256 do arquivo adulterado para verificar a rejeição pelo RAUC mesmo após validar o download. O teste confere que certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida preservam a seleção de boot do Limine e o slot inativo. O bundle válido promove B. O segundo boot confirma B e lê o documento salvo em A. Os logs seriais ficam em `OUT/https-tests/`.
 
 ## Canal de atualizações do PC
 
@@ -155,14 +159,14 @@ Prepare a geração do desktop com `MELKOR_CORE_REVISION=2` para uma base de rev
 make channel-pc CHANNEL_DESKTOP=1 OUT=out/pc-desktop VERSION=VERSAO \
   KEYRING=/caminho/rauc.pem CHANNEL_KEY=/caminho/channel.key BUNDLE_URL=URL_HTTPS_DA_RELEASE
 mkdir -p publicacao/canal
-cp out/pc-desktop/melkor-pc-desktop.json publicacao/canal/
+cp out/pc-desktop/melkor-pc-limine-desktop.json publicacao/canal/
 ```
 
 Publique somente o JSON nessa pasta. A chave de assinatura fica no ambiente de assinatura. O assinador verifica a geração dentro do bundle RAUC e exige a presença do serviço de login gráfico. O cliente exige o campo assinado `profile=desktop` para finalizar pela rede. O teste Go abre um servidor TLS local, valida o manifesto e o hash do bundle e testa o isolamento em relação ao canal de atualização da base.
 
 Publique a ISO, seu SHA-256 e o bundle gerado por `make bundle-pc` na release versionada de `wkoch/Melkor`. Cada arquivo de uma release precisa ter menos de 2 GiB. [Limites do GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)
 
-Depois de conferir o download do bundle sem autenticação, execute `make channel-pc` com o mesmo `OUT`, `VERSION` e `KEYRING`. Em `BUNDLE_URL`, passe a URL HTTPS do bundle na tag versionada. Envie somente o `melkor-pc-channel.json` assinado à release `pc-stable` do mesmo repositório. Essa release precisa aceitar a substituição do manifesto nas próximas publicações. Renove-o antes da validade de 90 dias ou ajuste `CHANNEL_DAYS`. Use a chave privada do canal só no ambiente de assinatura.
+Depois de conferir o download do bundle sem autenticação, execute `make channel-pc` com o mesmo `OUT`, `VERSION` e `KEYRING`. Em `BUNDLE_URL`, passe a URL HTTPS do bundle na tag versionada. Envie somente o `melkor-pc-limine-channel.json` assinado à release `pc-stable` do mesmo repositório. Essa release precisa aceitar a substituição do manifesto nas próximas publicações. Renove-o antes da validade de 90 dias ou ajuste `CHANNEL_DAYS`. Use a chave privada do canal só no ambiente de assinatura.
 
 ### Contas locais do PC
 
@@ -189,9 +193,9 @@ O teste rejeita a senha de laboratório antiga, autentica o usuário comum e con
 
 ## Protótipo A/B do M1
 
-Execute `make check-m1` com a imagem já gerada, Python, `sfdisk` e `blkid`. A verificação inspeciona o GPT, os quatro sistemas de arquivos, o estado inicial do GRUB, a associação entre os `PARTUUIDs` e os slots do RAUC, os kernels e o UUID usado para montar os dados. Ela lê o arquivo de disco sem criar dispositivos de bloco no host.
+Execute `make check-m1` com a imagem já gerada, Python, `sfdisk`, `blkid`, Mtools e `unsquashfs`. A verificação inspeciona o GPT, os quatro sistemas de arquivos, a configuração do Limine, a associação entre os `PARTUUIDs` e os slots do RAUC, os kernels e o UUID usado para montar os dados. Ela lê o arquivo de disco sem criar dispositivos de bloco no host.
 
-Execute `make test-boot BOARD=m1` com QEMU e OVMF. O teste cria uma cópia gravável do disco. Em A, faz login, grava um documento no home e sincroniza o disco. Em seguida, inicia outra VM com o mesmo disco e as mesmas variáveis UEFI, confirma que B está realçado no menu do GRUB antes de iniciar e confere o conteúdo. Os logs ficam em `serial-a.log` e `serial-b.log`, junto de `result.json`. As sondas coletam cada valor antes de emitir sua linha no console. A regressão injeta uma mensagem assíncrona durante a coleta e verifica os campos completos.
+Execute `make test-boot BOARD=m1` com QEMU e OVMF. O teste cria uma cópia gravável do disco. Em A, faz login, grava um documento no home e sincroniza o disco. Em seguida, inicia outra VM com o mesmo disco e as mesmas variáveis UEFI, confirma que B está realçado no menu do Limine antes de iniciar e confere o conteúdo. Os logs ficam em `serial-a.log` e `serial-b.log`, junto de `result.json`. As sondas coletam cada valor antes de emitir sua linha no console. A regressão injeta uma mensagem assíncrona durante a coleta e verifica os campos completos.
 
 A imagem de fábrica contém a mesma geração nos dois slots. Esse teste verifica a seleção manual e a persistência.
 
@@ -218,7 +222,7 @@ make test-update OUT=out/m1-rauc CERT="$lab/keyring.pem" KEY="$lab/key.pem" \
     ROOT_PASSWORD_FILE="$lab/root-password"
 ```
 
-O executor usa cópias graváveis do disco e das variáveis UEFI, sem interface de rede. Entrega os bundles por um segundo disco virtual somente para leitura. Verifica a recusa de um usuário comum, a exclusão mútua do atualizador, a assinatura inválida, o conteúdo corrompido e o identificador incompatível. Nos casos de rejeição, compara o hash do slot inativo e o estado do GRUB antes e depois.
+O executor usa cópias graváveis do disco e das variáveis UEFI, sem interface de rede. Entrega os bundles por um segundo disco virtual somente para leitura. Verifica a recusa de um usuário comum, a exclusão mútua do atualizador, a assinatura inválida, o conteúdo corrompido e um bundle com o identificador do layout antigo. Nos casos de rejeição, compara o hash do slot inativo e o estado do backend de boot do Limine antes e depois. Depois de uma interrupção física simulada, o backend deve deixar o kernel do slot inicial disponível, marcar a candidata como indisponível para boot e aceitar nova instalação assinada.
 
 O cenário válido instala em B, mantém o hash de A, confirma B no primeiro boot e verifica uma segunda inicialização em B. Depois seleciona A manualmente. Outro cenário instala uma candidata assinada cujo serviço de confirmação falha e verifica o retorno automático a A no próximo boot. O cenário de interrupção encerra o QEMU assim que identifica uma escrita parcial no slot B e verifica o boot em A, o hash desse slot e o documento persistente. Em seguida, o executor reaplica o bundle e confirma B. Os logs e o relatório JSON ficam em `OUT/update-tests/`.
 

@@ -8,7 +8,7 @@ Use a ISO Melkor Live em um pendrive com Ventoy. O sistema carrega o kernel e a 
 
 1. Baixe `melkor-live-v0.1.0-alpha.3-x86_64.iso` e `SHA256SUMS`. Confira a ISO com `sha256sum --ignore-missing -c SHA256SUMS` no diretório do download.
 2. Copie o arquivo `.iso` para a partição de dados do pendrive Ventoy, como um arquivo comum. [Como copiar imagens para o Ventoy](https://www.ventoy.net/en/doc_start.html)
-3. No HP ProBook x360 435 G7, ligue o notebook, pressione `Esc` e depois `F9` e escolha a entrada UEFI do pendrive. O GRUB desta mídia é sem assinatura e requer Secure Boot desativado. Se usar Windows com BitLocker, tenha acesso à chave de recuperação antes de alterar a configuração do firmware. Preserve o modo UEFI e restaure a configuração anterior depois do teste. [Secure Boot no HP](https://support.hp.com/in-en/document/ish_6930187-6931079-16) · [Recuperação do BitLocker](https://learn.microsoft.com/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview)
+3. No HP ProBook x360 435 G7, ligue o notebook, pressione `Esc` e depois `F9` e escolha a entrada UEFI do pendrive. O Limine desta mídia é distribuído sem assinatura UEFI e requer Secure Boot desativado. Se usar Windows com BitLocker, tenha acesso à chave de recuperação antes de alterar a configuração do firmware. Preserve o modo UEFI e restaure a configuração anterior depois do teste. [Secure Boot no HP](https://support.hp.com/in-en/document/ish_6930187-6931079-16) · [Recuperação do BitLocker](https://learn.microsoft.com/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview)
 4. No Ventoy, selecione a ISO e escolha **Boot in normal mode**, se aparecer o menu de modos. Se o modo normal não iniciar nessa unidade, o menu oferece **Boot in grub2 mode**. Selecione **Melkor Linux - diagnostico em RAM**. No console local, entre com `melkor` como usuário e senha. `id` deve indicar UID 1000 e `cat /proc/mounts` mostra a raiz em memória.
 5. Execute `ls /sys/block`, `lspci`, `lsusb` e `/usr/sbin/iw dev`. Confira se aparecem o SSD, a GPU, a placa de rede e o leitor de digitais. Registre o ID USB do leitor no formato `vvvv:pppp`, que determina o suporte pelo libfprint.
 6. Fotografe ou anote as saídas relevantes e encerre a sessão. Desligue pelo botão de energia, mantendo-o pressionado se necessário, e remova o pendrive para voltar ao sistema habitual.
@@ -23,11 +23,19 @@ dmesg | grep -Ei 'iwlwifi|iwlmvm|01:00[.]0|rfkill|regulatory'
 
 ## Instalação da base no disco inteiro
 
-Inicie a ISO mínima pelo Ventoy e escolha **Instalar Melkor**. A lista mostra um número, modelo, capacidade e setor lógico para cada disco interno elegível. Digite o número do disco e confira o modelo e a capacidade repetidos na confirmação. Digite `APAGAR` somente se você tiver cópia dos dados e quiser apagar todas as partições daquele disco. Defina senhas distintas para `root` e `melkor`.
+As ISOs geradas pelo código atual abrem o menu do Limine. No Ventoy, use **Boot in normal mode**. A opção **Instalar Melkor (serial)** destina-se ao uso por console serial e aos testes em VM.
+
+Inicie a ISO mínima pelo Ventoy e escolha **Instalar Melkor**. Na ISO gerada pelo código atual, digite `instalar core`. A ISO pública alpha.5 abre a lista diretamente. A lista mostra um número, modelo, capacidade e setor lógico para cada disco interno elegível. Digite o número do disco e confira o modelo e a capacidade repetidos na confirmação. Digite `APAGAR` somente se você tiver cópia dos dados e quiser apagar todas as partições daquele disco. Defina senhas distintas para `root` e `melkor`.
 
 Ao concluir, reinicie sem a mídia e entre como `melkor`. A base abre no console e permite configurar Wi-Fi com `iwctl`.
 
 ### Instalar o desktop depois
+
+Em uma instalação que já contém os novos comandos, conecte ao Wi-Fi e execute `instalar pacote noctalia` como `melkor`. Digite a senha de root quando solicitada e reinicie após a instalação. Use `atualizar` como `melkor` nas próximas atualizações.
+
+O core com Limine consulta o canal de desktop do mesmo layout de boot. As instruções da alpha.5 abaixo atendem aos discos instalados com GRUB. Uma troca de layout em um disco já instalado exige migração de boot ou reinstalação.
+
+`instalar <aplicativo>` encaminha as receitas ao perfil da conta. A compilação das receitas atuais depende de Podman. Firefox ESR, Brave Origin e Blanc ainda chegam na geração assinada do desktop. A instalação independente desses navegadores requer artefatos binários com as suas dependências e versões próprias no catálogo.
 
 Com a ISO mínima da versão `pc-v0.1.0-alpha.5-desktop`, conecte-se ao Wi-Fi com `iwctl`. Entre como root com `su -`, execute `melkor-finalizar` e reinicie. O comando baixa o manifesto e o bundle por HTTPS, verifica as assinaturas e instala o desktop no slot inativo. [ISO mínima e bundle desktop](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.5-desktop)
 
