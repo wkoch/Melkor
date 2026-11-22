@@ -1,0 +1,7 @@
+config BR2_PACKAGE_MELKOR_NUSHELL
+	bool "Nushell (upstream static binary)"
+	depends on BR2_x86_64
+	depends on BR2_TOOLCHAIN_USES_MUSL
+	help
+	  Interactive Nushell for the PC desktop. The POSIX shell
+	  remains available for system scripts and recovery.

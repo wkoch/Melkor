@@ -1,6 +1,9 @@
 source "$BR2_EXTERNAL_MELKOR_PATH/package/dinit/Config.in"
 source "$BR2_EXTERNAL_MELKOR_PATH/package/dnsproxy/Config.in"
 source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-dhcpcd/Config.in"
+source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-storage/Config.in"
+source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-installer/Config.in"
+source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-nushell/Config.in"
 
 config BR2_MELKOR_LIVE_BUILTIN_FIRMWARE
 	bool "Embed firmware for the Intel AX200 in the Live kernel"

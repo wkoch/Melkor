@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercita a instalação assinada M1 em discos virtuais descartáveis."""
+"""Exercita instalação assinada do core em discos virtuais descartáveis."""
 
 import argparse
 from contextlib import contextmanager
@@ -18,30 +18,32 @@ from types import SimpleNamespace
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 BOOT = runpy.run_path(str(SCRIPTS / "test-boot.py"))
-create_bundle = runpy.run_path(str(SCRIPTS / "bundle-m1.py"))["create_bundle"]
+BUNDLE = runpy.run_path(str(SCRIPTS / "bundle-m1.py"))
+create_bundle = BUNDLE["create_bundle"]
 GRUBENV = "/run/melkor/esp/EFI/BOOT/grubenv"
 DOCUMENT = "/home/melkor/persistencia-atualizacao"
 INPUT = "/persist/rauc/test-bundle.raucb"
 UPDATE = f"/usr/sbin/melkor-core-update {INPUT}"
 
 
-def fixture_images(build, work):
+def fixture_images(build, work, outcomes=("healthy", "unhealthy")):
     host = build / "host/bin"
     source = build / "images/rootfs.squashfs"
     empty = work / "empty"
     empty.mkdir()
     pseudo = work / "original.pseudo"
     subprocess.run([host / "unsquashfs", "-processors", "2", "-pf", pseudo, source], check=True)
-    header, separator, payload = pseudo.read_bytes().partition(b"# START OF DATA - DO NOT MODIFY\n")
-    assert separator, "Metadados SquashFS ausentes."
-    filename = b"etc/dinit.d/rauc-confirm"
-    lines = header.splitlines(keepends=True)
-    filtered = [line for line in lines if not line.startswith(filename + b" ")]
-    assert len(filtered) == len(lines) - 1, "Serviço de confirmação ausente."
-    unhealthy = work / "unhealthy.pseudo"
-    unhealthy.write_bytes(b"".join(filtered) + separator + payload)
-
-    for name, metadata in (("healthy", pseudo), ("unhealthy", unhealthy)):
+    for name in outcomes:
+        metadata = pseudo
+        if name == "unhealthy":
+            header, separator, payload = pseudo.read_bytes().partition(b"# START OF DATA - DO NOT MODIFY\n")
+            assert separator, "Metadados SquashFS ausentes."
+            filename = b"etc/dinit.d/rauc-confirm"
+            lines = header.splitlines(keepends=True)
+            filtered = [line for line in lines if not line.startswith(filename + b" ")]
+            assert len(filtered) == len(lines) - 1, "Serviço de confirmação ausente."
+            metadata = work / "unhealthy.pseudo"
+            metadata.write_bytes(b"".join(filtered) + separator + payload)
         command = [host / "mksquashfs", empty, work / f"{name}.squashfs", "-noappend", "-processors", "2",
                    "-no-progress", "-comp", "gzip", "-pf", metadata, "-p",
                    f"etc/melkor-test-generation f 0644 0 0 echo {name}"]
@@ -57,10 +59,13 @@ def seed_disk(args, work):
     seed = work / "bundles"
     seed.mkdir()
     rauc = args.build / "host/bin/rauc"
+    compatible = BUNDLE["PC_COMPATIBLE" if args.pc_image else "COMPATIBLE"]
+    capacity = BUNDLE["PC_SLOT_SIZE" if args.pc_image else "SLOT_SIZE"]
     for name, version in (("healthy", "2.0-test"), ("unhealthy", "3.0-test")):
-        create_bundle(rauc, work / f"{name}.squashfs", args.cert, args.key, args.cert, version, seed / f"{name}.raucb")
+        create_bundle(rauc, work / f"{name}.squashfs", args.cert, args.key, args.cert, version,
+                      seed / f"{name}.raucb", compatible=compatible, slot_size=capacity)
     create_bundle(rauc, work / "healthy.squashfs", args.cert, args.key, args.cert, "2.0-test", seed / "incompatible.raucb",
-                  compatible="other-m1")
+                  compatible=BUNDLE["COMPATIBLE"] if args.pc_image else "other-m1", slot_size=capacity)
 
     data = bytearray((seed / "healthy.raucb").read_bytes())
     signed = len(data) - int.from_bytes(data[-8:], "big") - 8
@@ -72,15 +77,17 @@ def seed_disk(args, work):
     (seed / "corrupted.raucb").write_bytes(data)
 
     disk = work / "seed.ext4"
-    size = sum(path.stat().st_size for path in seed.iterdir()) + 16 * 1024 * 1024
+    payload = sum(path.stat().st_size for path in seed.iterdir())
+    size = payload + max(32 * 1024 * 1024, payload // 8)
     with disk.open("wb") as stream:
         stream.truncate(((size + 4095) // 4096) * 4096)
-    subprocess.run(["mke2fs", "-q", "-F", "-t", "ext4", "-d", seed, disk], check=True)
+    subprocess.run(["mke2fs", "-q", "-F", "-t", "ext4", "-m", "0", "-O", "^has_journal", "-d", seed, disk],
+                   check=True)
     return disk
 
 
 @contextmanager
-def machine(work, stage, disk, seed, code, variables, timeout, accel, write_limit=False):
+def machine(work, stage, disk, seed, code, variables, timeout, accel, write_limit=False, network=False):
     binary = os.environ.get("QEMU_SYSTEM") or shutil.which("qemu-system-x86_64", path=BOOT["SYSTEM_PATH"])
     if not binary:
         raise RuntimeError("Instale qemu-system-x86_64.")
@@ -91,8 +98,9 @@ def machine(work, stage, disk, seed, code, variables, timeout, accel, write_limi
     disk_options = "if=none,id=melkor,cache=none"
     if write_limit:
         disk_options += ",bps_wr=2097152"
+    nic = "user,model=virtio-net-pci" if network else "none"
     argv = [binary, "-machine", "q35", "-accel", accel, "-m", "512", "-display", "none", "-serial", "stdio",
-            "-monitor", "none", "-nic", "none", "-no-reboot",
+            "-monitor", "none", "-nic", nic, "-no-reboot",
             "-drive", drive(code, "if=pflash,unit=0,readonly=on"),
             "-drive", drive(variables, "if=pflash,unit=1"),
             "-drive", drive(disk, disk_options),
@@ -175,7 +183,7 @@ def wait_for_partial_write(disk, candidate):
 def scenario(args, work, seed, code, firmware_vars, password, outcome, timeout, accel):
     work.mkdir()
     disk, variables = work / "disk.img", work / "OVMF_VARS.fd"
-    shutil.copyfile(args.build / "images/melkor-m1.img", disk)
+    subprocess.run(["cp", "--reflink=auto", "--sparse=always", "--", args.image, disk], check=True)
     shutil.copyfile(firmware_vars, variables)
     @contextmanager
     def root(stage, write_limit=False, select_a=False):
@@ -183,7 +191,8 @@ def scenario(args, work, seed, code, firmware_vars, password, outcome, timeout, 
             if select_a:
                 console.expect(rb"The highlighted entry will be executed automatically in", "menu do GRUB")
                 console.send(b"\x1b[A", end=b"")
-                console.expect(rb"\*Melkor Linux M1 - slot A", "seleção manual de A")
+                target = b"PC" if args.pc_image else b"M1"
+                console.expect(rb"\*Melkor Linux " + target + rb" - slot A", "seleção manual de A")
                 console.send(b"")
             BOOT["login"](console, b"root", password, rb"^[^\n]*# ")
             yield console
@@ -263,11 +272,13 @@ def scenario(args, work, seed, code, firmware_vars, password, outcome, timeout, 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("build", type=Path)
+    parser.add_argument("--pc-image", type=Path, help="Disco virtual PC com a mesma geração do build.")
     parser.add_argument("--cert", type=Path, required=True)
     parser.add_argument("--key", type=Path, required=True)
     parser.add_argument("--root-password-file", type=Path, required=True)
     parser.add_argument("--log-dir", type=Path, required=True)
     args = parser.parse_args()
+    args.image = args.pc_image or args.build / "images/melkor-m1.img"
     args.log_dir.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="rauc-", dir=args.log_dir.resolve()))
     print(f"Evidências em {work}", flush=True)
@@ -289,7 +300,7 @@ def main():
         digest = BOOT["file_digest"]
         report.update(
             commit=subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-            imagem_sha256=digest(args.build / "images/melkor-m1.img"),
+            imagem_sha256=digest(args.image),
             firmware_sha256=digest(code), variaveis_uefi_sha256=digest(variables),
             acelerador=accel, prazo_segundos=timeout,
         )

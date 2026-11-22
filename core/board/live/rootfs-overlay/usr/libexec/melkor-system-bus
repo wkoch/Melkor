@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+install -d -m 0755 /run/dbus
+dbus-uuidgen --ensure=/run/machine-id
+exec dbus-daemon --system --nofork --nopidfile --print-address=4

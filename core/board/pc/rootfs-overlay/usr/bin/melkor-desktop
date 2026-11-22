@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+umask 077
+session=$(mktemp -d /tmp/melkor-wayland.XXXXXX)
+trap 'rm -rf -- "$session"' EXIT
+export XDG_RUNTIME_DIR="$session"
+export XDG_SESSION_TYPE=wayland
+export LIBSEAT_BACKEND=seatd
+export LANG=C.UTF-8
+case "${1:-}" in
+    "")
+        if test -x /opt/melkor-desktop/usr/bin/umbriel; then
+            set -- --umbriel
+        else
+            set -- --weston
+        fi
+        ;;
+    --umbriel|--weston) ;;
+    *) printf '%s\n' 'Uso: melkor-desktop [--weston|--umbriel]' >&2; exit 2 ;;
+esac
+case "$1" in
+    --umbriel)
+        export XDG_CURRENT_DESKTOP=Umbriel
+        dbus-run-session -- /usr/libexec/melkor-desktop-session /usr/bin/melkor-session-exec umbriel -c /etc/xdg/melkor/umbriel.toml
+        ;;
+    --weston)
+        export XDG_CURRENT_DESKTOP=Weston
+        dbus-run-session -- /usr/libexec/melkor-desktop-session weston --renderer=pixman
+        ;;
+esac

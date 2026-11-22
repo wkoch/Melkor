@@ -20,17 +20,18 @@ if tool == "git":
         print(os.environ.get("TEST_COMMIT", commit))
 elif tool == "make":
     build = Path(next(value[2:] for value in args if value.startswith("O=")))
-    if args[-1].endswith("_defconfig"):
+    if args[-1].endswith("_defconfig") or args[-1] == "defconfig":
         build.mkdir(parents=True, exist_ok=True)
         options = [
             "BR2_TOOLCHAIN_BUILDROOT_MUSL", "BR2_GCC_VERSION_14_X", "BR2_INIT_NONE",
             "BR2_PACKAGE_DINIT", "BR2_TARGET_GRUB2_X86_64_EFI",
-            "BR2_TARGET_ROOTFS_CPIO_GZIP" if args[-1] == "melkor_live_defconfig" else "BR2_TARGET_ROOTFS_SQUASHFS",
+            "BR2_TARGET_ROOTFS_CPIO_GZIP" if args[-1] in ("melkor_live_defconfig", "melkor_installer_defconfig")
+            else "BR2_TARGET_ROOTFS_SQUASHFS",
             "BR2_DOWNLOAD_FORCE_CHECK_HASHES",
         ]
         (build / ".config").write_text("".join(f"{name}=y\n" for name in options
                                             if name != os.environ.get("TEST_MISSING_OPTION")))
-        (build / "board").write_text(args[-1].split("_")[1])
+        (build / "board").write_text("pc" if args[-1] == "defconfig" else args[-1].split("_")[1])
     elif args[-1] == "source":
         if os.environ.get("https_proxy") == "http://127.0.0.1:9":
             assert os.environ["NO_PROXY"] == "" and os.environ["no_proxy"] == ""
@@ -45,6 +46,15 @@ elif tool == "make":
         (build / "images" / f"melkor-{board}.img").write_text("disco virtual")
         if board == "live":
             (build / "images/melkor-live.iso").write_text("mídia óptica virtual")
+        if board == "installer":
+            (build / "images/bzImage").write_text("kernel simulado")
+            (build / "images/rootfs.cpio.gz").write_text("initramfs simulado")
+        if board == "pc":
+            (build / "images/bzImage").write_text("kernel simulado")
+            (build / "images/rootfs.squashfs").write_text("rootfs simulado")
+            esp = build / "images/efi-part/EFI/BOOT"
+            esp.mkdir(parents=True)
+            (esp / "bootx64.efi").write_text("EFI")
         tools = build / "host/bin"
         tools.mkdir(parents=True)
         for name in ("gcc", "ld", "readelf"):

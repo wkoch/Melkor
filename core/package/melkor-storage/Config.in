@@ -1,0 +1,5 @@
+config BR2_PACKAGE_MELKOR_STORAGE
+	bool "melkor-storage"
+	depends on BR2_PACKAGE_HOST_GO_TARGET_ARCH_SUPPORTS
+	help
+	  Resolve the other partitions from the disk that booted Melkor.

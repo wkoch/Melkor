@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Empacota e assina uma geração do core M1 com a ferramenta RAUC do build."""
+"""Empacota e assina uma geração do core com a ferramenta RAUC do build."""
 
 import argparse
 import os
@@ -13,9 +13,12 @@ import tempfile
 
 COMPATIBLE = "melkor-m1-x86_64"
 SLOT_SIZE = 128 * 1024 * 1024
+PC_COMPATIBLE = "melkor-pc-x86_64"
+PC_SLOT_SIZE = 2 * 1024 * 1024 * 1024
 
 
-def create_bundle(rauc, image, certificate, key, keyring, version, output, compatible=COMPATIBLE):
+def create_bundle(rauc, image, certificate, key, keyring, version, output, compatible=COMPATIBLE, slot_size=None):
+    capacity = SLOT_SIZE if slot_size is None else slot_size
     if not re.fullmatch(r"[0-9][a-zA-Z0-9._-]{0,63}", version):
         raise ValueError("Informe uma versão iniciada por dígito e sem espaços.")
     for path in (rauc, image, certificate, key, keyring):
@@ -24,8 +27,8 @@ def create_bundle(rauc, image, certificate, key, keyring, version, output, compa
     if output.exists():
         raise ValueError(f"O bundle já existe: {output}.")
     with image.open("rb") as stream:
-        if stream.read(4) != b"hsqs" or image.stat().st_size > SLOT_SIZE:
-            raise ValueError("O payload deve ser SquashFS e caber no slot M1 de 128 MiB.")
+        if stream.read(4) != b"hsqs" or image.stat().st_size > capacity:
+            raise ValueError(f"O payload deve ser SquashFS e caber no slot de {capacity >> 20} MiB.")
 
     with tempfile.TemporaryDirectory(prefix=".bundle-", dir=output.parent) as scratch:
         work = Path(scratch)
@@ -46,6 +49,7 @@ def create_bundle(rauc, image, certificate, key, keyring, version, output, compa
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("build", type=Path)
+    parser.add_argument("--pc", action="store_true", help="Gera um bundle para o layout PC de 2 GiB por slot.")
     parser.add_argument("--cert", type=Path, required=True)
     parser.add_argument("--key", type=Path, required=True)
     parser.add_argument("--keyring", type=Path, required=True)
@@ -53,8 +57,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
+        config = (PC_COMPATIBLE, PC_SLOT_SIZE) if args.pc else (COMPATIBLE, SLOT_SIZE)
         create_bundle(args.build / "host/bin/rauc", args.build / "images/rootfs.squashfs",
-                      args.cert, args.key, args.keyring, args.version, args.output)
+                      args.cert, args.key, args.keyring, args.version, args.output, *config)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(error, file=sys.stderr)
         return 1

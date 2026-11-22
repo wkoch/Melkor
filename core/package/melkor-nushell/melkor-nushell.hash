@@ -1,0 +1,3 @@
+# SHA-256 published in the upstream GitHub release asset metadata.
+sha256  2b808786d44af41170a29f8b9a15b5113bb6ea5dda9221098eca932f8a149924  nu-0.117.0-x86_64-unknown-linux-musl.tar.gz
+sha256  ff5dcaaba6140ec57cafdd4f707cd0d329e727477cf7d5b9ba7a244ec2678b79  LICENSE

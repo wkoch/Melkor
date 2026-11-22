@@ -6,9 +6,15 @@ O marco M0 entrega uma imagem x86-64 que inicia por UEFI e chega ao console seri
 
 ## Testar a primeira prévia
 
+O fluxo padrão começa com o PC Core por UEFI, com console, Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. O instalador atualizado usa o número do SSD e a confirmação `APAGAR`. Depois de iniciar pelo SSD, `melkor-finalizar` aplica o bundle assinado do desktop. [Instalação em duas etapas](docs/INSTALACAO.md#instalação-da-base-no-disco-inteiro) · [Publicação do canal do desktop](docs/TESTES.md#canal-do-desktop)
+
 Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot serial. A prévia inclui dinit, slots A/B, armazenamento persistente e DNS do sistema via Quad9 DoH. A release também oferece o CLI de aplicativos para o host Linux x86-64. A instalação em computador físico faz parte do M4. [Melkor v0.1.0-alpha.1](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
 
 Para conferir o HP ProBook x360 435 G7, use a ISO **Melkor Live** com Ventoy. Ela roda em RAM e abre um console local para conferir tela, teclado e a detecção de dispositivos. [Teste de hardware pelo pendrive](docs/INSTALACAO.md#teste-de-hardware-pelo-pendrive)
+
+Após aplicar o bundle do desktop e reiniciar, a tela de login gráfico abre automaticamente. Entre como `melkor` com a senha que você definiu no instalador para iniciar Umbriel com Noctalia. Ao encerrar a sessão, a tela de login volta. Nessa tela, `Ctrl+Alt+F2` abre o console de recuperação.
+
+Use `Super+Enter` para abrir Alacritty com Nushell. O Firefox ESR abre links HTTP e HTTPS por padrão. O lançador também inclui Brave Origin e Blanc. Os três navegadores reproduzem áudio pelo PipeWire da sessão. [Evidências do perfil](docs/TESTES.md#perfil-de-aplicativos-do-pc)
 
 ## A experiência pretendida
 
@@ -23,7 +29,9 @@ O fluxo previsto é baixar uma geração assinada do Melkor pela própria instal
 
 Quem modificar a receita poderá gerar a própria imagem em um ambiente de build, com as fontes e ferramentas necessárias. Isso pode ser feito localmente em vez de depender de outra máquina. Os projetos de origem fornecem as versões e correções usadas pelas receitas. A instalação e suas atualizações dispensam enviar alterações a esses projetos.
 
-O M1 usa RAUC para atualizar o core por um bundle local assinado. Entre em uma sessão root para executar `melkor-core-update /caminho/bundle.raucb` e reinicie para testar a geração instalada. A publicação e o download de gerações ainda fazem parte da entrega. `melkor atualizar` atende aos aplicativos do catálogo e compila só as receitas revisadas que mudaram. [Marcos](docs/MARCOS.md)
+No PC, entre com `su -` e execute `melkor-core-update`. O endereço de fábrica é `https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-channel.json`. O comando consulta a revisão anunciada, valida o manifesto e instala uma versão mais recente no slot inativo. Reinicie para ativá-la. O canal oficial anuncia a revisão 1 do PC Core. [Publicação do canal](docs/TESTES.md#canal-de-atualizações-do-pc)
+
+Para usar outro endereço HTTPS que publique manifestos assinados pela chave do canal, execute `melkor-core-update --channel URL`. A escolha persiste entre atualizações. Use `melkor-core-update --reset-channel` para restaurar o endereço de fábrica. Para instalar um bundle específico, o PC aceita `melkor-core-update --https URL SHA256` e o PC e o M1 aceitam `melkor-core-update /caminho/bundle.raucb`. `melkor atualizar` atende aos aplicativos do catálogo. [Marcos](docs/MARCOS.md)
 
 ## Começar com o Codex
 
@@ -56,9 +64,23 @@ O host Bazzite é imutável e não tem `sudo` sem senha. As ferramentas de build
 | `make test-boot BOARD=m1` | Imagem M1, QEMU e OVMF | Inicia A, grava um documento e o lê após selecionar B, usando a mesma cópia do disco. |
 | `make env BOARD=live` e `make image BOARD=live` | Ambiente Buildroot, rede para preparar o cache inicial e saída nova | Verifica as fontes e constrói `melkor-live.iso` e `melkor-live.img`, mídias UEFI x86-64 que carregam o sistema em RAM. |
 | `make test-boot BOARD=live` | Imagem Live, QEMU, OVMF, `sfdisk` e `mke2fs` | Inicia pelo USB virtual e confere o login, o framebuffer e a integridade do NVMe virtual. |
+| `make test-live-wifi HWSIM=…` | Build Live, QEMU, `cpio` e módulo `mac80211_hwsim.ko` compilado para o mesmo kernel | Exercita a associação WPA2 pelo usuário comum, sem usar a rede do host. [Preparação do módulo](docs/TESTES.md#associação-wi-fi-em-qemu) |
+| `make env BOARD=pc` e `make image BOARD=pc` | Contêiner de build, cache de fontes e saída própria para o alvo PC | Gera o core, o kernel e o bootloader do protótipo PC. |
+| `make image BOARD=pc OUT=out/pc-minimal` | Ambiente PC preparado e diretório de saída novo | Gera o core mínimo com console, Wi-Fi, Ethernet, Quad9 DoH e RAUC. As camadas de desktop selecionam a edição completa. |
+| `make env BOARD=installer` e `make image BOARD=installer` | Contêiner de build, cache preparado e saída nova | Gera o kernel e o initramfs da mídia dedicada de instalação. |
+| `make installer-iso PC_OUT=out/pc` e `make test-installer` | Builds do PC e do instalador, `cpio`, `dosfstools`, QEMU e OVMF | Empacota o core na ISO e testa a instalação sem rede em um NVMe virtual. `TEST_SECTOR_SIZE=4096` testa 4Kn. `PC_DESKTOP_BUNDLE=…` aplica o desktop após instalar a base e testa o login. [Validação do instalador](docs/TESTES.md#instalação-de-disco-inteiro) |
+| `make pc-disk` e `make test-pc-disk` | Build PC, Go, `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools`, QEMU e OVMF | Cria um arquivo de disco de laboratório e inicia seus dois slots por NVMe virtual. `PC_DISK_GIB` ajusta os 16 GiB iniciais. |
+| `make pc-disk PC_CREDENTIALS=…` | Build PC, `fakeroot` do Buildroot e arquivo privado de hashes | Registra senhas separadas de root e do usuário comum nos dados persistentes. [Validação das contas](docs/TESTES.md#contas-locais-do-pc) |
+| `make test-pc-desktop` | Disco virtual PC, QEMU e OVMF | Exercita o login local e o terminal Wayland. `PC_DESKTOP_LOGIN=1` seleciona o teste do login gráfico com Umbriel. `PC_DESKTOP_AUDIO=1` exercita a placa HDA virtual com `PC_DESKTOP_APPS=1`, a camada de aplicativos e o driver WAV do QEMU. |
+| `make pc-desktop-layer pc-chromium-layer pc-session-layer` | Podman rootless, Python 3.11+, curl e cache dos pacotes fixados | Prepara os aplicativos e as dependências gráficas e compila Umbriel, Noctalia e gtkgreet. [Build e testes do perfil](docs/TESTES.md#perfil-de-aplicativos-do-pc) |
 | `make test-dns OUT=out/m1-doh` | Imagem M1, QEMU, OVMF, `tcpdump` e acesso HTTPS ao Quad9 | Confirma DoH pelo resolvedor da VM e inspeciona o tráfego com e sem acesso à internet. Use `DNS_IPV6_ONLY=1` em um host com acesso IPv6. |
+| `make test-dns BOARD=live` | ISO Live, QEMU, OVMF, `tcpdump` e acesso HTTPS ao Quad9 | Executa os mesmos casos de DoH pelo adaptador Ethernet virtual da sessão Live. |
 | `make bundle-m1 OUT=out/m1-rauc CERT=… KEY=… KEYRING=… VERSION=1.0` | Build do M1, certificado de assinatura, chave privada e chaveiro público confiável pela imagem | Usa o RAUC do build para gerar `OUT/melkor-m1-1.0.raucb` a partir do SquashFS. |
 | `make test-update OUT=out/m1-rauc CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Imagem M1 com certificado e credencial descartáveis, Python 3.11+, QEMU, OVMF, `mke2fs` e `sfdisk` | Testa instalação, rejeições, confirmação e recuperação do core em cópias do disco. [Procedimento de laboratório](docs/TESTES.md#bundles-assinados-e-recuperação-m1) |
+| `make bundle-pc CERT=… KEY=… KEYRING=… VERSION=…` e `make test-update BOARD=pc CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Build e disco virtual PC com as credenciais do laboratório | Usa a compatibilidade RAUC própria do PC e testa a atualização em discos descartáveis. |
+| `make test-update-https CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Build e disco virtual PC, Python 3.11+, QEMU, OVMF, OpenSSL e `mke2fs` | Serve bundles por TLS local e verifica rejeições, promoção e persistência em uma cópia do disco. [Procedimento](docs/TESTES.md#download-https-de-atualizações-do-pc) |
+| `make channel-pc VERSION=… KEYRING=… CHANNEL_KEY=… BUNDLE_URL=…` | Bundle PC já criado, chave Ed25519 privada do canal, chaveiro RAUC e ferramentas do build | Verifica o bundle e gera `OUT/melkor-pc-channel.json` com a revisão extraída do SquashFS. |
+| `make test-channel-pc CERT=… KEY=… ROOT_PASSWORD_FILE=… CHANNEL_KEY=… CHANNEL_CANDIDATE=…` | Dois builds PC com revisões crescentes e chaves descartáveis | Exercita a atualização sem argumentos e a troca persistente de canal. [Procedimento](docs/TESTES.md#canal-de-atualizações-do-pc) |
 | `make test` | Go 1.24+, compilador C, Python 3.11+, coverage.py e kcov | Executa a suíte local e reprova cobertura abaixo de 80%. [Preparação e critérios](docs/TESTES.md#cobertura-do-código-próprio) |
 
 Em um ambiente com as ferramentas já instaladas, use `BUILD_ENV=` para executar os comandos diretamente. No CI, a execução direta é o padrão. O teste de boot requer Python 3.11 ou posterior, QEMU e um par OVMF em formato raw. Em M0, ele abre a imagem somente para leitura. Em M1, usa uma cópia gravável da imagem. Ambos usam uma cópia privada das variáveis UEFI em `OUT/tests/`.

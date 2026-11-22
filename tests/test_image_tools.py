@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 import importlib.util
 import io
@@ -24,13 +25,61 @@ def script(name):
 boot = script("test-boot")
 image = script("check-m1-image")
 bundle = script("bundle-m1")
+installer = script("installer-iso")
 
 LOGIN = b"\rmelkor login: \n\rPassword: \nmelkor$ \n"
 PROBE = b"M0-ID=melkor\nM0-PID1=dinit\nM0-LOGIN=melkor\nM0-UEFI=yes\nM0-ROOT=squashfs,ro\nM0-END\n"
 MENU = b"Melkor Linux M1 - slot B\nPress enter to boot the selected OS\n*Melkor Linux M1 - slot A\n"
 LIVE = (b"LIVE-VERSION=live\nLIVE-USER=ok\nLIVE-DISPLAY=ok\nLIVE-DEVICES=ok\n"
         b"LIVE-PERMISSIONS=ok\nLIVE-TOOLS=ok\nLIVE-RAM=ok\nLIVE-HOME=ok\nLIVE-END\n"
-        b"LIVE-FIRMWARE=ok\nLIVE-REGDB=ok\nLIVE-WIFI-END\n")
+        b"LIVE-FIRMWARE=ok\nLIVE-REGDB=ok\nLIVE-IWD=ok\nLIVE-WIFI-END\n")
+
+
+class InstallerMediaTest(unittest.TestCase):
+    def test_valida_manifestos_antes_de_montar_iso(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            kernel = root / "build/images/bzImage"
+            kernel.parent.mkdir(parents=True)
+            kernel.write_bytes(b"kernel")
+            (root / "SHA256SUMS").write_text(f"{hashlib.sha256(b'kernel').hexdigest()}  bzImage\n")
+            self.assertEqual(installer.asset(root, "bzImage")[0], kernel)
+            kernel.write_bytes(b"adulterado")
+            with patch.object(installer.subprocess, "run") as run, self.assertRaisesRegex(ValueError, "SHA-256"):
+                installer.prepare_media(root, root, root / "install.iso")
+            run.assert_not_called()
+
+    def test_midia_monta_payload_grub_e_publica_sem_sobrescrever(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for mode, files in {
+                "installer": {"bzImage": b"kernel", "rootfs.cpio.gz": b"initramfs"},
+                "pc": {"rootfs.squashfs": b"core", "efi-part/EFI/BOOT/bootx64.efi": b"grub-pc"},
+            }.items():
+                output = root / mode
+                hashes = []
+                for name, contents in files.items():
+                    path = output / "build/images" / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(contents)
+                    hashes.append(f"{hashlib.sha256(contents).hexdigest()}  {name}\n")
+                (output / "SHA256SUMS").write_text("".join(hashes))
+
+            def tool(args, **options):
+                if args[0] == "cpio":
+                    self.assertIn(b"melkor/core.sha256", options["input"])
+                    options["stdout"].write(b"payload")
+                elif Path(args[0]).name == "xorriso":
+                    self.assertIn("MELKOR_INSTALL_x86_64", args)
+                    self.assertTrue((Path(args[-1]) / "rootfs.cpio.gz").read_bytes().startswith(b"initramfs"))
+                    Path(args[args.index("-o") + 1]).write_bytes(b"iso")
+
+            output = root / "install.iso"
+            with patch.object(installer.subprocess, "run", side_effect=tool):
+                installer.prepare_media(root / "installer", root / "pc", output)
+                with self.assertRaises(FileExistsError):
+                    installer.prepare_media(root / "installer", root / "pc", output)
+            self.assertEqual(output.read_bytes(), b"iso")
 
 
 class BundleTest(unittest.TestCase):
@@ -75,6 +124,14 @@ class BundleTest(unittest.TestCase):
         self.assertEqual(self.output.read_bytes(), b"bundle de teste")
         self.assertEqual(list(self.build.glob(".bundle-*")), [])
 
+    def test_cli_pc_seleciona_capacidade_e_compatibilidade_proprias(self):
+        argv = ["bundle-m1.py", str(self.build), "--pc", "--cert", str(self.cert), "--key", str(self.key),
+                "--keyring", str(self.cert), "--version", "1.0", "--output", str(self.output)]
+        with patch.object(sys, "argv", argv), patch.object(bundle, "create_bundle") as create:
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(bundle.main(), 0)
+        self.assertEqual(create.call_args.args[-2:], ("melkor-pc-x86_64", 2 * 1024 ** 3))
+
     def test_recusa_entradas_invalidas_e_limpa_assinatura_incompleta(self):
         with self.assertRaisesRegex(ValueError, "versão"):
             self.create("nova\n[update]")
@@ -112,7 +169,8 @@ class SerialTest(unittest.TestCase):
             boot.check_live_console(process, io.BytesIO(), timeout=1)
             self.assertIn(boot.LIVE_PROBE.encode(), process.stdin.getvalue())
             self.assertIn(boot.LIVE_WIFI_PROBE.encode(), process.stdin.getvalue())
-        for field in (b"LIVE-RAM=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-USER=ok", b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok"):
+        for field in (b"LIVE-RAM=ok", b"LIVE-PERMISSIONS=ok", b"LIVE-USER=ok",
+                      b"LIVE-FIRMWARE=ok", b"LIVE-REGDB=ok", b"LIVE-IWD=ok"):
             with self.subTest(field=field), console(LOGIN + PROBE + LIVE.replace(field, b"")) as process:
                 with self.assertRaisesRegex(RuntimeError, field.decode()):
                     boot.check_live_console(process, io.BytesIO(), timeout=1)
@@ -141,6 +199,27 @@ class SerialTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "antes de confirmar"):
                 boot.check_console(process, io.BytesIO(), timeout=1, slot="B")
             self.assertEqual(process.stdin.getvalue(), b"\x1b[B")
+
+    def test_disco_pc_exige_arquivo_swap(self):
+        persist = (b"\nM1-VERSION=pc\nM1-SLOT=rauc.slot=A\nM1-DATA=rw,nosuid\n"
+                   b"M1-DOCUMENT=melkor-m1-persistencia\nM1-SYNC=ok\nM1-END\n")
+        with console(LOGIN + PROBE + b"\nPC-SWAP=ok\n" + persist) as process:
+            boot.check_console(process, io.BytesIO(), timeout=1, slot="A", pc=True)
+            self.assertIn(boot.PC_SWAP_PROBE.encode(), process.stdin.getvalue())
+        with console(LOGIN + PROBE + persist) as process:
+            with self.assertRaisesRegex(RuntimeError, "PC-SWAP=ok"):
+                boot.check_console(process, io.BytesIO(), timeout=1, slot="A", pc=True)
+
+    def test_disco_pc_exige_senha_root_separada_e_protege_shadow(self):
+        rejected = b"\rmelkor login: \n\rPassword: \n\rLogin incorrect\r\n"
+        privilege = b"PC-USER=ok\nPassword: \nmelkor# \nPC-ROOT=ok\nmelkor$ \n"
+        persist = (b"\nPC-SWAP=ok\nM1-VERSION=pc\nM1-SLOT=rauc.slot=A\nM1-DATA=rw,nosuid\n"
+                   b"M1-DOCUMENT=melkor-m1-persistencia\nM1-SYNC=ok\nM1-END\n")
+        with console(rejected + LOGIN + privilege + PROBE + persist) as process:
+            boot.check_console(process, io.BytesIO(), timeout=1, slot="A", pc=True,
+                               credentials=(b"usuario", b"administracao"))
+            self.assertTrue(process.stdin.getvalue().startswith(b"melkor\rmelkor\rmelkor\rusuario\r"))
+            self.assertIn(b"su -\radministracao\r", process.stdin.getvalue())
 
     def test_boot_rejeita_identidade_ou_raiz_incorreta(self):
         for target, replacement, error in (
@@ -185,7 +264,8 @@ class BootRunnerTest(unittest.TestCase):
         for file in (self.code, self.variables, self.disk):
             file.write_bytes(file.name.encode())
         self.args = argparse.Namespace(
-            image=self.disk, ovmf_code=self.code, ovmf_vars=self.variables, ab=False, live=False,
+            image=self.disk, ovmf_code=self.code, ovmf_vars=self.variables, ab=False, live=False, pc=False,
+            pc_user_password=None, pc_root_password=None,
             accel="auto", timeout=None,
         )
 
@@ -205,6 +285,37 @@ class BootRunnerTest(unittest.TestCase):
 
     def test_m1_reutiliza_copia_gravavel_e_variaveis_nos_dois_slots(self):
         self.check_run(ab=True)
+
+    def test_sondas_emitem_campos_inteiros_com_mensagens_assincronas(self):
+        tools = self.path / "bin"
+        tools.mkdir()
+        for name, body in {
+            "awk": """case "$2" in
+    /proc/cmdline) printf '%s\n' 'rauc.slot=A' ;;
+    /proc/mounts) case "$1" in
+        *ext4*) printf '%s\n' 'rw,nosuid,nodev' ;;
+        *) printf '%s\n' 'squashfs,ro' ;;
+    esac ;;
+esac
+""",
+            "cat": """case "$1" in
+    /proc/1/comm) printf '%s\n' dinit ;;
+    *) printf '%s\n' melkor-m1-persistencia ;;
+esac
+""",
+        }.items():
+            executable = tools / name
+            executable.write_text("#!/bin/sh\nprintf '%s\n' '[  OK  ] rauc-setup' >&2\n" + body)
+            executable.chmod(0o755)
+
+        completed = subprocess.run(["sh", "-c", boot.PROBE + "; " + boot.PERSIST_PROBE],
+                                   env=os.environ | {"PATH": f"{tools}:{os.defpath}"},
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
+        lines = completed.stdout.splitlines()
+        for field in ("M0-ROOT=squashfs,ro", "M1-SLOT=rauc.slot=A", "M1-DATA=rw,nosuid,nodev",
+                      "M1-DOCUMENT=melkor-m1-persistencia"):
+            self.assertIn(field, lines)
+        self.assertEqual(lines.count("[  OK  ] rauc-setup"), 5)
 
     def test_live_inicia_por_usb_e_confere_hash_do_nvme(self):
         self.args.live = True

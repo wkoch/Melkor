@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+runtime=/opt/melkor-desktop
+if ! test -x "$runtime/usr/bin/alacritty"; then
+    exec /usr/bin/foot "$@"
+fi
+export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
+exec "$runtime/lib/ld-musl-x86_64.so.1" --library-path "$runtime/lib:$runtime/usr/lib" \
+    "$runtime/usr/bin/alacritty" --config-file /etc/xdg/alacritty/melkor.toml -e /usr/bin/nu "$@"

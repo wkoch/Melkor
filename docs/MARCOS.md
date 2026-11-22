@@ -55,7 +55,7 @@ O SHA-256 da imagem é `dd0e00611b6afb92cba4802f8f131897fff789935373701645abd1a9
 
 `make test` passou com 84,9% das instruções Go, 95,5% das instruções e ramos Python e 96,0% das linhas Shell. Cada script Shell superou 80%. Relatórios em `out/coverage/test-ho6gs7q9/`. `make test-boot OUT=out/m0-revalidado` também passou na regressão de boot do M0.
 
-Faltam Kibi e a mídia de recuperação, o provisionamento de instalações em disco físico e o fluxo de publicação e download de bundles. A validação de saúde do desktop fica para o M2.
+Faltam Kibi, a mídia de recuperação, a publicação de bundles assinados e o teste de instalação em disco físico. O download explícito de bundles pelo PC está descrito adiante. A validação de saúde do desktop fica para o M2.
 
 ### Validação do DNS do sistema
 
@@ -132,7 +132,7 @@ O [procedimento de importação](TESTES.md#provas-de-importação-isolada) regis
 | `make test-packages OUT=out/importacao-m3.gtMyaJ/retorno …` | O DEB removido voltou a executar após reativar a geração anterior e leu o dado gravado. Foi possível selecionar de novo a geração mais recente sem o DEB. Evidências em `out/importacao-m3.gtMyaJ/retorno/package-tests/pacotes-1pwwcq44/`. |
 | `make test` | Rejeições de manifestos, caminhos, arquivos e imagens ausentes preservaram a geração ativa. Cobertura de 86,7% em Go, 95,7% em Python e 96,0% em Shell. Relatórios em `out/coverage/test-45esy_dp/`. |
 
-O catálogo separado passou pelo teste local de proposta, aceite, sincronização de tag SSH assinada e instalação em um segundo perfil sem IA. O primeiro PR real foi aberto pelo CLI e passou na CI do repositório privado. A primeira versão assinada do catálogo aguarda a revisão do PR. [Testes do catálogo](TESTES.md#publicação-e-consumo-de-receitas) · [PR #1](https://github.com/wkoch/Melkor-Recipes/pull/1)
+O catálogo separado passou pelo teste local de proposta, aceite, sincronização de tag SSH assinada e instalação em um segundo perfil sem IA. O primeiro PR real foi aberto pelo CLI, passou na CI e foi integrado. A tag assinada `v0.1.0` aponta para o merge `0e936c1`. A sincronização por HTTPS ativou a receita do Nushell em um perfil descartável com a chave pública fixada em `catalogo/allowed_signers`. [Testes do catálogo](TESTES.md#publicação-e-consumo-de-receitas) · [PR #1](https://github.com/wkoch/Melkor-Recipes/pull/1)
 
 ## M4 — Instalar e usar no computador
 
@@ -170,3 +170,103 @@ A alpha.3 embute o firmware no kernel, habilita PCI MSI e inclui a base regulat�
 | `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | Cobertura de 86,7% em Go, 95,3% em Python e 96,9% em Shell. Os boots de regressão do M0 e do M1 passaram. |
 
 O SHA-256 da ISO é `b1570905e948e0c20a21fb194b625f0c884336afea637669da49ca320795570b`.
+
+### Integração em QEMU do disco PC
+
+O alvo `pc` exercita a distribuição de espaço em disco, a atualização do core e uma sessão Wayland com Weston. O ambiente Fedora 45 compilou os novos pacotes após configurar o alvo PC e reutilizou a toolchain do Buildroot já verificada. O gerador atua sobre arquivos regulares e a instalação física continua pendente.
+
+| Comando ou cenário | Resultado |
+| --- | --- |
+| `make check-env BOARD=pc` | O contêiner `melkor-build`, o bundle fixado e as fontes do alvo passaram na verificação offline. |
+| `make pc-disk OUT=out/pc-validated` | O gerador Go preparou a GPT, a ESP, os dois slots SquashFS e a ext4. Os testes de unidade cobrem a geometria com setores lógicos de 512 e 4096 bytes, a recusa de um SHA-256 divergente e a preservação de arquivos existentes. |
+| `QEMU_ACCEL=tcg make test-pc-disk OUT=out/pc-validated` | Com OVMF, os dois slots iniciaram no mesmo NVMe virtual. O slot B reabriu o documento criado em A e os dois ativaram o swap de 4 GiB. Evidências em `out/pc-validated/tests/boot-oypthttp/`. |
+| `make test-pc-desktop OUT=out/pc-validated` | Com KVM, VGA virtual e OVMF, a conta comum entrou pelo console local e iniciou Weston com DRM. O teste abriu foot pelo painel e capturou as telas. Evidências em `out/pc-validated/desktop-tests/desktop-r6ugrtse/`. |
+| `make test-live-wifi OUT=out/pc-live-validated HWSIM=…` | Com QEMU e dois rádios `mac80211_hwsim`, a conta comum criou um ponto de acesso com WPA2 e se conectou a ele. Evidências em `out/pc-live-validated/wifi-tests/wifi-901hh8xs/`. |
+| Ventoy 1.1.18 por UEFI e TCG | A ISO com o rótulo `MELKOR_LIVE_x86_64` e os arquivos usados pelo GRUB no início passou pelos modos normal e GRUB2. O arquivo ISO ocupava dois trechos na partição FAT32 do pendrive virtual. A conta local autenticou nos dois modos e o hash do NVMe permaneceu igual. Evidências em `out/ventoy-lab/pc-layout-normal/` e `out/ventoy-lab/pc-layout-grub2/`. |
+| `make test-dns BOARD=live OUT=out/pc-live-validated` e `make test-dns BOARD=pc OUT=out/pc-validated`, ambos com e sem `DNS_IPV6_ONLY=1` | O Quad9 respondeu por HTTPS. As capturas de rede do QEMU também confirmaram a falha da consulta sem recurso a DNS em texto claro quando o acesso ao Quad9 foi interrompido. O enlace dos testes de DNS foi Ethernet virtual. |
+| `make bundle-pc OUT=out/pc-rauc-lab …` e `QEMU_ACCEL=tcg make test-update BOARD=pc OUT=out/pc-rauc-lab …` | O core recusou bundle adulterado, assinatura inválida e uma imagem para M1. O teste confirmou a atualização A → B, a volta automática a A após falha de confirmação e nova instalação após interromper a gravação. O documento do usuário persistiu. Evidências em `out/pc-rauc-lab/update-tests/rauc-i5b9nxu6/`. |
+| `KCOV=out/test-tools/fedora/usr/bin/kcov make test TEST_PYTHON=out/test-venv/bin/python` | 36 testes Python e cobertura de 84,9% em Go, 94,5% em Python e 96,9% em Shell. |
+
+Em um disco de laboratório criado com `make pc-disk OUT=out/pc-credentials-lab PC_CREDENTIALS=…`, `make test-pc-disk` recusou a senha antiga e verificou a proteção das credenciais, a sessão comum e o `su -` com senha separada nos dois slots. O cenário usou o SquashFS anterior com o novo executável e o script de persistência empacotados na VM. Evidências em `out/pc-credentials-lab/tests/boot-0kh1y6vq/`.
+
+O build limpo `make image BOARD=pc OUT=out/pc-clean` gerou o SquashFS, o kernel e o GRUB. `sha256sum --check` confirmou os três arquivos. A sessão Weston e o terminal foot passaram novamente em `make test-pc-desktop OUT=out/pc-clean`. O teste de DoH passou sobre Ethernet virtual em IPv4 e IPv6 com o novo disco. A validação do disco provisionado em `out/pc-clean-auth` repetiu a recusa da senha antiga, a autenticação separada de root, os dois boots por NVMe, o swap e a leitura do documento em B. Evidências em `out/pc-clean-auth/tests/boot-t7umowp3/`. A suíte final registrou 37 testes Python e cobertura de 84,8% em Go, 93,3% em Python e 96,9% em Shell.
+
+O mesmo core, reempacotado com o certificado público de laboratório, repetiu os três cenários de `make test-update BOARD=pc` em KVM. As credenciais de root vieram do volume persistente. O RAUC rejeitou os três bundles de teste inválidos, promoveu a candidata saudável, voltou ao slot A após falha de confirmação e aceitou nova instalação após a interrupção de escrita. Evidências em `out/pc-clean-rauc-evidence/`.
+
+### Atualização por HTTPS no PC
+
+O Buildroot recompilou a receita `melkor-storage` e montou a raiz do PC em um diretório vazio com a toolchain já verificada. O SquashFS recebeu o certificado público descartável do RAUC. A verificação com `sha256sum -c ../../SHA256SUMS` aprovou o SquashFS, o kernel e o GRUB em `out/pc-https/build/images/`. `make pc-disk OUT=out/pc-https PC_CREDENTIALS=…` preparou o disco virtual com senhas separadas.
+
+Com KVM, `make test-update-https OUT=out/pc-https CERT=… KEY=… ROOT_PASSWORD_FILE=…` verificou a trava de atualização e a recusa de certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida. Nenhuma recusa mudou a ordem do GRUB ou o slot inativo. A atualização válida preservou A, iniciou B com o marcador da geração candidata e manteve o documento do usuário. Os logs estão em `out/pc-https/https-tests/https-fdtkvvy2/`. `make test-pc-desktop OUT=out/pc-https-desktop` também passou com o mesmo SquashFS. [Procedimento de laboratório](TESTES.md#download-https-de-atualizações-do-pc)
+
+`make test` passou com 41 testes Python e cobertura de 80,2% em Go, 92,4% em Python e 96,4% em Shell. O teste usou certificados descartáveis e o canal público de bundles assinados segue pendente.
+
+O Buildroot gerou os SquashFS das revisões de laboratório 1 e 2, com a URL estável da fábrica e a chave Ed25519 pública de teste. `make channel-pc` extraiu o bundle RAUC verificado e assinou o manifesto com a revisão 2. Em QEMU com KVM, `make test-channel-pc OUT=out/pc-channel-lab …` provou a recusa de assinatura alterada, a instalação pela chamada sem argumentos e o boot em B. A seleção de canal persistiu, a mesma revisão foi reconhecida como atual e o reset restaurou a configuração de fábrica. `make test` passou com 45 testes Python e cobertura de 80,1% em Go, 92,4% em Python e 96,7% em Shell. Os registros estão em `out/pc-channel-lab/`. [Procedimento](TESTES.md#canal-de-atualizações-do-pc)
+
+### Instalação offline pela ISO
+
+A mídia dedicada empacota o core PC e prepara uma GPT pelo tamanho e pelo setor lógico do disco selecionado. O fluxo pede confirmação pelo ID estável e provisiona as duas contas antes de abrir o destino para gravação. A ISO foi validada com o NVMe que recebe o sistema e outro NVMe gravável. Os testes comparam os hashes do vizinho e iniciam os dois slots com a mídia removida. A instalação física no HP, a sessão definitiva Umbriel/Noctalia, o perfil dos navegadores e a autenticação por digital continuam pendentes.
+
+`make check-env BOARD=installer` confirmou o cache offline. A mídia de laboratório usou a toolchain do build do PC, com reinstalação dos pacotes selecionados em uma raiz vazia e recompilação do util-linux, kmod e eudev. `make installer-iso OUT=out/installer-clean PC_OUT=out/pc-clean-auth` conferiu os arquivos dos dois builds e produziu a ISO. O catálogo El Torito contém a entrada UEFI, com a imagem EFI de 16 MiB.
+
+`make test` passou com 40 testes Python e cobertura de 80,7% em Go, 92,4% em Python e 96,3% em Shell. [Roteiro de validação](TESTES.md#instalação-de-disco-inteiro)
+
+A mesma ISO passou pela instalação offline em QEMU 11.1.3 com OVMF e TCG, como CD UEFI com setores lógicos de 512 bytes, pelo modo normal do Ventoy 1.1.18 com 512 bytes e pelo modo GRUB2 com 4096 bytes. Em cada um, a confirmação inválida preservou o destino. A instalação válida fez a GPT até a reserva final, protegeu as senhas e chegou ao login nos dois slots, com swap ativo e o mesmo documento. O disco vizinho de 13 GiB manteve o SHA-256 integral. Os relatórios estão em `out/installer-clean/evidence/`.
+
+`make installer-iso OUT=out/installer-https-lab PC_OUT=out/pc-https` reempacotou a mídia com o core que inclui o atualizador. `make test-installer BUILD_ENV= OUT=out/installer-https-lab` passou pelo CD UEFI com o QEMU 11.1.3 do host em TCG. Os dois slots iniciaram e o disco vizinho manteve seu SHA-256. O relatório está em `out/installer-https-lab/tests/install-ac346fvy/result.json`.
+
+### Prévia com aplicativos
+
+O core de laboratório em `out/pc-apps-release` inclui Nushell, Alacritty, Firefox ESR, Brave Origin, Blanc, Umbriel e Noctalia. O build reutilizou a toolchain do PC, recompilou o kernel com namespaces de usuário e manteve dinit como PID 1. As receitas e os hashes do SDK e das camadas ficam em `apps/desktop/`.
+
+O executor `tests/pc_desktop_vm.py --apps --chromium --umbriel` iniciou a sessão gráfica com a conta comum. Noctalia abriu o painel e o atalho `Super+Enter` iniciou o Nushell no Alacritty. O Firefox renderizou uma página local e abriu por Wayland. Brave Origin e Blanc criaram processos de renderização com seccomp ativo. O registro e as capturas estão em `out/pc-apps-release/desktop-tests/desktop-9u5v96ak/`. A ISO de 945 MiB passou pelo CD UEFI e pelo modo normal do Ventoy, com 8 GiB na VM. O cancelamento preservou o disco de destino e a instalação válida iniciou os dois slots com o NVMe vizinho intacto. Relatórios em `out/pc-apps-iso/tests/install-cagrlxdw/` e `out/pc-apps-iso/ventoy/install-jqfzqjq_/`.
+
+`make test` passou com 48 testes Python e cobertura de 80,1% em Go, 92,0% em Python e 97,2% em Shell. [Comandos](TESTES.md#perfil-de-aplicativos-do-pc)
+
+### Desktop padrão e reprodução de áudio
+
+`make pc-desktop-layer pc-chromium-layer` montou as camadas com Podman rootless, APKs e DEBs verificados pelos hashes fixados. O Buildroot executou `linux-reconfigure` no contêiner Fedora 45 e gerou o core com as três camadas, reutilizando a toolchain do PC e a camada já compilada de Umbriel e Noctalia. `make pc-disk OUT=out/pc-desktop-next/core` gravou somente o disco virtual de laboratório.
+
+`make test-pc-desktop OUT=out/pc-desktop-next/core PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_UMBRIEL=1 PC_DESKTOP_AUDIO=1` confirmou Umbriel e Noctalia pelo comando `melkor-desktop`, Alacritty com Nushell e Firefox como padrão HTTP e HTTPS. Firefox ESR, Brave Origin e Blanc abriram fluxos de reprodução. O QEMU gravou amostras da saída HDA virtual, e o Pulse rejeitou captura e carregamento de módulos. A sessão Weston também iniciou com `--weston`. Logs e gravação em `out/pc-desktop-next/core/desktop-tests/desktop-6ywl500p/`.
+
+`make installer-iso OUT=out/pc-desktop-next/ventoy-ready PC_OUT=out/pc-desktop-next/core` gerou a ISO de 951 MiB com SHA-256 `91ff6077fac4f03280ff78f9222f09c191d642365c14b721c724e14e7d921fcb`. O teste `make test-installer TEST_VM_MEMORY=8192` e a variante `tests/installer_vm.py --ventoy-drive` usaram a mesma ISO, com QEMU, OVMF, TCG e setores lógicos de 512 bytes. A mídia inicializou por CD UEFI e pelo modo normal do Ventoy. Nos dois casos a instalação confirmou A e B, e os hashes do NVMe vizinho conferiram. Relatórios em `out/pc-desktop-next/ventoy-ready/tests/`.
+
+`make test` passou com 49 testes Python e cobertura de 80,1% em Go, 92,0% em Python e 97,0% em Shell. O teste de áudio no HP, os portais de arquivos, o desbloqueio no Noctalia e a biometria continuam pendentes.
+
+### Candidata do PC com as chaves oficiais
+
+O Buildroot recompôs o core de revisão 1 com a toolchain PC já validada e as três camadas de aplicativos. Os arquivos públicos do RAUC e do canal Ed25519 foram comparados com os PEM extraídos do SquashFS. `make installer-iso OUT=out/pc-official-prep/installer PC_OUT=out/pc-official-prep/verified-candidate` gerou a candidata para uso local. `make bundle-pc` e `make channel-pc` assinaram os artefatos. O SHA-256 da ISO é `c50bcd588127e4a5cbd7c8b411854f1be85116d4a4b121a3326064913f7a2057` e tem assinatura Ed25519 separada.
+
+Com OVMF e TCG, `tests/installer_vm.py --ventoy-drive` exercitou o pendrive virtual em modo normal, confirmou a instalação e os dois boots e preservou o disco vizinho. `make test-pc-desktop` verificou Umbriel, Noctalia, Alacritty, Nushell e os três navegadores com áudio em KVM. Os registros estão em `out/pc-official-prep/`. A publicação da imagem com os navegadores permanece pendente da revisão dos termos de redistribuição.
+
+O teste de atualização por TLS local em QEMU reconheceu a revisão oficial no manifesto Ed25519, rejeitou uma assinatura adulterada e instalou o bundle RAUC oficial pela opção `--https`. O slot B iniciou e preservou o documento gravado em A. Os registros estão em `out/pc-official-prep/signed-update-verified/`.
+
+### Primeira publicação do PC Core
+
+O Buildroot reconfigurou o alvo PC com `MELKOR_PC_MINIMAL=1`, recompôs a raiz de destino e gerou a revisão 1 com as chaves oficiais. A ISO de 157 MiB passou pelo Ventoy em modo normal no QEMU. O instalador iniciou os slots A e B e preservou o disco vizinho. O SHA-256 da ISO é `394676632894fa711b2364462b257a27356798ae0a2e5bc497ad2224d495dd7c`. [Release](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.4-core)
+
+`make bundle-pc` produziu o bundle RAUC assinado. A publicação conferiu seu download anônimo antes de publicar o manifesto gerado por `make channel-pc`. A VM do PC Core confirmou Quad9 DoH e reconheceu a revisão 1 pelo endereço oficial do GitHub. `make test` passou na CI com 80,1% em Go, 92,0% em Python e 97,3% em Shell. [Canal estável](https://github.com/wkoch/Melkor/releases/tag/pc-stable) · [Execução da CI](https://github.com/wkoch/Melkor/actions/runs/44941139935/job/136958394728)
+
+### Login gráfico automático na edição completa
+
+`make pc-desktop-layer pc-session-layer` montou o runtime Alpine com APKs fixados e compilou Umbriel, Noctalia e gtkgreet em Podman rootless. O Buildroot reaproveitou a toolchain PC do contêiner Fedora 45 e gerou o SquashFS com as três camadas e as chaves públicas oficiais. `make installer-iso OUT=out/pc-graphical-login/installer PC_OUT=out/pc-graphical-login/core` gerou a ISO local de 951 MiB. O SHA-256 `ff946fd8bb5bbc5ca7cc8b4ba18864b533c4c2af8ddea652f9c17f7eaeb75aa7` foi verificado com assinatura Ed25519.
+
+`make pc-disk OUT=out/pc-graphical-login/core` gerou o disco virtual, e `make test-pc-desktop OUT=out/pc-graphical-login/core PC_DESKTOP_LOGIN=1 PC_DESKTOP_APPS=1` passou em QEMU com KVM e OVMF. A tela apareceu no VT1, a senha errada e o login root foram recusados e Umbriel e Noctalia abriram como usuário comum. Alacritty com Nushell e Firefox ESR abriram. Encerrar Umbriel trouxe a tela de volta. O teste alternou para o console no VT2 e retornou ao VT1.
+
+`tests/installer_vm.py --ventoy-drive … --memory-mib 8192 --graphical-login` iniciou a mesma ISO pelo Ventoy 1.1.18 em modo normal com QEMU, OVMF e TCG. A confirmação inválida preservou o destino, a instalação usou o NVMe virtual e o disco vizinho manteve seu SHA-256. Os slots A e B iniciaram com a mídia removida. No teste gráfico em KVM, a senha de 128 bytes criada na instalação abriu a sessão. Firefox ESR, Brave Origin e Blanc reproduziram áudio na HDA virtual, e a política Pulse bloqueou captura e carregamento de módulos. Registros e capturas em `out/pc-graphical-login/installer/ventoy-tests/install-4e0jyrh3/`.
+
+`make test` passou com 52 testes Python e cobertura de 80,8% das instruções Go, 92,0% da métrica Python e 97,5% das linhas Shell. Relatórios em `out/coverage/`. A validação física no HP continua pendente.
+
+### Instalação mínima com seleção numérica
+
+`make image BOARD=pc` passou a selecionar o core mínimo quando não há camadas gráficas. O candidato local reutilizou o kernel, o initramfs e a entrada UEFI da ISO mínima assinada. Uma camada cpio inseriu `melkor-instalar` recompilado com o Go do host e o SquashFS base recebeu `melkor-finalizar`. O SquashFS foi reempacotado com `unsquashfs -pf` e `mksquashfs -pf`, com metadados e chaves de confiança conferidos. O xorriso 1.5.8 do Alpine remontou a ISO de teste. O SHA-256 firmado dessa mídia é `ea2b0de13beb7734fcdb8be6b4b2f9be3a2bfb652fc6f81de02940c94f2ac433`.
+
+`scripts/bundle-m1.py` gerou `melkor-desktop.raucb` com o RAUC 1.13 extraído do core já validado. O artefato local reutiliza o SquashFS do desktop aprovado no teste anterior. `rauc info --keyring` verificou a assinatura oficial e o formato verity.
+
+`tests/installer_vm.py --ventoy-drive … --desktop-bundle …` passou com a ISO final no QEMU, com OVMF e Ventoy 1.1.18. A confirmação inválida preservou o destino e o NVMe vizinho manteve seu SHA-256. A base iniciou por A e por B. `melkor-finalizar` promoveu o desktop pelo RAUC. Após o reboot, a senha provisionada de 128 bytes abriu Umbriel e Noctalia, e os três navegadores reproduziram áudio na HDA virtual. A mesma ISO passou também como CD UEFI com setores lógicos de 4096 bytes. Registros em `out/pc-instalacao-minima/evidence-final/` e `out/pc-instalacao-minima/evidence-4kn/`.
+
+`make test` passou com 53 testes Python e cobertura de 80,8% em Go, 92,0% em Python e 97,6% em Shell. O novo comando de finalização atingiu 100% das linhas instrumentadas.
+
+### Preparação do canal HTTPS do desktop
+
+`melkor-finalizar` ganhou um canal exclusivo com manifesto assinado. O teste TLS local confirmou o download do bundle pelo SHA-256 e a recusa de manifestos trocados entre a base e o desktop. `make test` passou com 81,0% em Go, 92,1% em Python e 97,7% em Shell. O diretório `publicacao` ficou configurado para o Netlify. A ativação depende do domínio, da publicação do bundle desktop e de uma imagem que inclua o cliente atualizado.

@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+if [ "$(id -u)" != 0 ] || [ "$#" -gt 1 ]; then
+    printf '%s\n' 'Entre com su - e execute melkor-finalizar [rótulo_do_pendrive].' >&2
+    exit 2
+fi
+
+if [ "$#" -eq 0 ]; then
+    exec melkor-core-update --desktop
+fi
+
+label=$1
+media=$(blkid -t "LABEL=$label" -o device) || media=
+if ! test -b "$media"; then
+    printf 'Conecte um pendrive FAT32 com o rótulo %s.\n' "$label" >&2
+    exit 1
+fi
+
+mountpoint=$(mktemp -d /run/melkor/desktop.XXXXXX)
+stage=
+mounted=
+cleanup() {
+    if [ -n "$mounted" ]; then
+        umount "$mountpoint" || :
+    fi
+    rmdir "$mountpoint"
+    if [ -n "$stage" ]; then
+        rm -f "$stage/melkor-desktop.raucb"
+        rmdir "$stage"
+    fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+mount -t vfat -o ro,nosuid,nodev,noexec "$media" "$mountpoint"
+mounted=yes
+stage=$(mktemp -d /persist/rauc/desktop.XXXXXX)
+install -m 0600 "$mountpoint/melkor-desktop.raucb" "$stage/melkor-desktop.raucb"
+umount "$mountpoint"
+mounted=
+melkor-core-update "$stage/melkor-desktop.raucb"
+printf '%s\n' 'Desktop instalado. Reinicie para abrir o login gráfico.'

@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+install -d -m 0700 /persist/.swap
+swap=/persist/.swap/swapfile
+if [ ! -e "$swap" ]; then
+    umask 077
+    pending=$(mktemp /persist/.swap/preparo.XXXXXX)
+    trap 'rm -f -- "$pending"' EXIT
+    fallocate -l 4G "$pending"
+    mkswap "$pending"
+    mv -T "$pending" "$swap"
+fi
+swapon "$swap"

@@ -1,0 +1,4 @@
+auth     requisite /opt/melkor-desktop/usr/lib/security/pam_succeed_if.so quiet user = melkor
+auth     required  /opt/melkor-desktop/usr/lib/security/pam_unix.so
+account  required  /opt/melkor-desktop/usr/lib/security/pam_unix.so
+session  required  /opt/melkor-desktop/usr/lib/security/pam_permit.so

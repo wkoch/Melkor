@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+browser=${0##*/}
+case "$browser" in
+    melkor-firefox)
+        runtime=/opt/melkor-desktop
+        program=/usr/bin/firefox-esr
+        ;;
+    melkor-brave-origin|melkor-blanc)
+        runtime=/opt/melkor-chromium
+        if [ "$browser" = melkor-brave-origin ]; then
+            program=/opt/brave.com/brave-origin/brave-origin
+        else
+            program=/opt/blanc/AppRun
+        fi
+        set -- --ozone-platform=wayland "$@"
+        ;;
+    *) printf '%s\n' 'Use melkor-firefox, melkor-brave-origin ou melkor-blanc.' >&2; exit 2 ;;
+esac
+socket="${XDG_RUNTIME_DIR:-}/${WAYLAND_DISPLAY:-}"
+if ! test -x "$runtime$program" || ! test -S "$socket"; then
+    printf '%s\n' 'Entre na sessão Wayland do Melkor com o perfil de aplicativos instalado.' >&2
+    exit 1
+fi
+umask 077
+profile="$HOME/.local/share/melkor/${browser#melkor-}"
+mkdir -p "$profile"
+pulse="$XDG_RUNTIME_DIR/pulse/native"
+set -- "$program" "$@"
+if test -S "$pulse"; then
+    set -- --ro-bind "$pulse" /run/pulse/native --setenv PULSE_SERVER unix:/run/pulse/native -- "$@"
+else
+    set -- -- "$@"
+fi
+exec /usr/bin/bwrap --unshare-user --unshare-pid --unshare-ipc --unshare-uts --die-with-parent \
+    --ro-bind "$runtime" / --dev /dev --proc /proc --tmpfs /tmp --perms 0700 --tmpfs /run --tmpfs /home \
+    --tmpfs /dev/shm --bind "$profile" /home/browser --ro-bind "$socket" /run/wayland \
+    --ro-bind /etc/resolv.conf /etc/resolv.conf \
+    --clearenv --setenv HOME /home/browser --setenv PATH /usr/bin:/bin \
+    --setenv XDG_RUNTIME_DIR /run --setenv WAYLAND_DISPLAY wayland \
+    --setenv MOZ_ENABLE_WAYLAND 1 --chdir /home/browser "$@"

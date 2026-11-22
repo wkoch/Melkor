@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+if ! test -x /opt/melkor-desktop/usr/bin/pipewire; then
+    exec "$@"
+fi
+
+audio_pids=
+cleanup() {
+    for child in $audio_pids; do kill "$child" 2>/dev/null || :; done
+    for child in $audio_pids; do wait "$child" 2>/dev/null || :; done
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+for service in pipewire wireplumber pipewire-pulse; do
+    /usr/bin/melkor-session-exec "$service" >"${XDG_RUNTIME_DIR:?}/$service.log" 2>&1 &
+    audio_pids="$audio_pids $!"
+done
+
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    test -S "$XDG_RUNTIME_DIR/pulse/native" && break
+    sleep 0.1
+done
+"$@"

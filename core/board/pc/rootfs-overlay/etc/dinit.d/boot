@@ -1,0 +1,9 @@
+type = internal
+depends-on = console-local
+waits-for = serial-console
+waits-for = pc-swap
+waits-for = rauc-confirm
+waits-for = network-link
+waits-for = dns
+waits-for = wifi
+waits-for = seatd

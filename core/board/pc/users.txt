@@ -1,0 +1,4 @@
+# Conta do laboratório de instalação em VM.
+- - netdev -1 - - - - -
+greeter 203 greeter 203 * - - video Login-grafico
+melkor 1000 melkor 1000 $6$melkor-m0$470inhuImxeGkBZsEUsOmIqxhecSlisW3pouUdfsuzuNwZ3fbxG.irLrNFnfKfOY2k877tmIm/TFAk5g.54BK1 /home/melkor /bin/sh netdev,video,audio Console-PC

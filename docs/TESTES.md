@@ -64,11 +64,131 @@ O teste Live verifica a presença do firmware da AX200 e dos dois arquivos da ba
 
 Depois da validação virtual, use a mídia no notebook para conferir o console com tela e teclado locais e obter os IDs dos componentes. [Procedimento para o HP](INSTALACAO.md#teste-de-hardware-pelo-pendrive)
 
+### Associação Wi-Fi em QEMU
+
+Após `make image BOARD=live`, compile `mac80211_hwsim` a partir da mesma árvore Linux e com o compilador do build. Os comandos abaixo usam a saída padrão com Linux 6.12.117 dentro do contêiner de build.
+
+```sh
+linux="$PWD/out/live/build/build/linux-6.12.117"
+make -C "$linux" M=drivers/net/wireless/virtual ARCH=x86 \
+    CROSS_COMPILE="$PWD/out/live/build/host/bin/x86_64-buildroot-linux-musl-" \
+    CONFIG_MAC80211_HWSIM=m modules
+make test-live-wifi HWSIM="$linux/drivers/net/wireless/virtual/mac80211_hwsim.ko"
+```
+
+O executor monta uma camada de initramfs descartável com dois rádios e inicia a VM sem interfaces QEMU ligadas ao host. A conta comum cria um ponto de acesso WPA2 em um rádio, associa o segundo com `iwctl` e confirma o SSID com `iw`. O módulo fica fora da mídia distribuída. O teste de endereçamento e DoH usa um adaptador Ethernet distinto, com `make test-dns BOARD=live` e, em um host com IPv6, `make test-dns BOARD=live DNS_IPV6_ONLY=1`.
+
+## Instalação de disco inteiro
+
+Use `make check-env BOARD=installer` para conferir o cache. As entradas de build para saídas novas são `make image BOARD=pc OUT=out/pc` e `make image BOARD=installer OUT=out/installer`. Com os dois builds disponíveis, `make installer-iso PC_OUT=out/pc OUT=out/installer` usa o GRUB e o xorriso do build do instalador, além de `cpio` e `mkfs.vfat` do contêiner.
+
+`make test-installer OUT=out/installer` cria dois arquivos NVMe descartáveis e inicia a ISO como CD em QEMU/OVMF. O teste escolhe o disco pelo número, verifica a recusa de uma confirmação errada antes de gravar, fornece senhas descartáveis, confere a GPT completa e reinicia a VM sem a mídia por A e por B. O SHA-256 de todo o disco vizinho é comparado antes e depois. `TEST_SECTOR_SIZE=4096` usa um NVMe 4Kn e requer uma versão de `sfdisk` com `--sector-size` no host de teste.
+
+Para o teste em duas etapas, use `make test-installer OUT=out/installer PC_DESKTOP_BUNDLE=/caminho/melkor-desktop.raucb`. O executor usa `mkfs.vfat` e `mcopy` para preparar um segundo arquivo de mídia descartável. Ele confere que a base iniciou sem greeter, executa `melkor-finalizar` como root e verifica o login gráfico com a senha criada no instalador. Use a opção `PC_DESKTOP_LOGIN=1` ao testar diretamente uma ISO completa.
+
+Para a variante Ventoy, use `python3 tests/installer_vm.py ISO --log-dir DIRETÓRIO --ventoy-drive PENDRIVE_VIRTUAL` no contêiner. O arquivo regular do pendrive virtual precisa conter apenas `melkor-installer.iso` na partição de dados FAT. O executor usa `mtype` para comparar o SHA-256 desse arquivo ao da ISO informada e abre o pendrive virtual somente para leitura. `--ventoy-mode grub2` seleciona GRUB2.
+
+## Protótipo de disco PC
+
+Com `make env BOARD=pc` concluído, use `make image BOARD=pc` e `make pc-disk` para gerar um arquivo regular com GPT e 16 GiB lógicos. O gerador exige Go no host, além de `sfdisk`, `mke2fs`, `mkfs.vfat`, `mtools` e `grub-editenv`. Os testes unitários exercitam os limites do particionamento, a validação do SquashFS e a preservação de arquivos preexistentes. `make test-pc-disk` usa uma cópia de trabalho com QEMU e OVMF. Ele confirma boot UEFI pelos dois slots no mesmo NVMe virtual, o conteúdo do home e a ativação do swap de 4 GiB. Para testar Weston com `make test-pc-desktop`, gere o core do laboratório com `MELKOR_PC_MINIMAL=0` e use outra cópia do disco.
+
+Para testar o RAUC nesse disco, use o procedimento de credenciais descartáveis descrito para o M1 e troque o alvo de build para `BOARD=pc`. Execute `make pc-disk` com o mesmo `OUT`, `make bundle-pc` com o certificado desse laboratório e `make test-update BOARD=pc` com o mesmo certificado, a chave e o arquivo da senha de root. A diferença de identificador RAUC entre PC e M1 também é um caso de rejeição.
+
+## Perfil de aplicativos do PC
+
+Prepare as camadas em um host com Podman rootless, Python 3.11+ e curl. O cache guarda APKs, DEBs e arquivos dos fornecedores com SHA-256 fixado em `apps/desktop/`. A rede é usada para obter as entradas e as imagens OCI no primeiro build. Os contêineres de montagem e compilação rodam sem rede.
+
+```sh
+make pc-desktop-layer pc-chromium-layer pc-session-layer
+make image BOARD=pc OUT=out/pc-apps \
+  MELKOR_PC_DESKTOP_LAYER="$PWD/out/pc-desktop.layer.tar.gz" \
+  MELKOR_PC_CHROMIUM_LAYER="$PWD/out/pc-chromium.layer.tar.gz" \
+  MELKOR_PC_SESSION_LAYER="$PWD/out/pc-session.layer.tar.gz"
+make pc-disk OUT=out/pc-apps
+make test-pc-desktop OUT=out/pc-apps PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 \
+  PC_DESKTOP_LOGIN=1 PC_DESKTOP_AUDIO=1
+```
+
+O executor usa QMP para confirmar a troca para o console de recuperação e testar a tela de login. Ele verifica a recusa de uma senha incorreta e da conta root, entra como `melkor` e confere o UID da sessão e o socket de Noctalia. Ao encerrar Umbriel, ele aguarda o retorno da tela de login. A execução com a ISO usa `make test-installer OUT=out/installer TEST_VM_MEMORY=8192 PC_DESKTOP_LOGIN=1`. Ela valida o login gráfico com uma senha aleatória de 128 bytes provisionada pelo próprio instalador e inicia os dois slots sem a mídia. O caso gráfico usa disco virtual com setor lógico de 512 bytes.
+
+O executor aciona o terminal e executa a expressão `[1 2 3] | math sum` com Nushell. O GIO confirma as associações HTTP e HTTPS e o Firefox renderiza uma página local. Nos navegadores Chromium a prova exige um processo de renderização com filtro seccomp. Com `PC_DESKTOP_AUDIO=1`, o QEMU fornece uma placa HDA e grava a saída em WAV. O teste verifica que o Pulse rejeita a criação de um fluxo de captura e o carregamento de módulos, que cada navegador cria um fluxo de reprodução e que o WAV contém amostras de áudio. Os perfis descartáveis pulam as telas de boas-vindas dos navegadores para tocar o tom. O Blanc recebe a página por HTTP no loopback da VM, pois seu encaminhamento de URLs aceita HTTP e HTTPS. Os logs seriais e as capturas ficam em `OUT/desktop-tests/` ou na pasta `desktop/` do teste do instalador.
+
+O runtime usa os APKs do Cage 0.3.0-r0 e do greetd 0.10.3-r11 do Alpine 3.24. O SDK descartável adiciona os cabeçalhos do GTK 3 e do json-c para compilar gtkgreet 0.8. A fonte do gtkgreet e os APKs estão fixados nos locks. O patch do Melkor mantém o comando de abertura de Umbriel fixo, remove as decorações da janela em modo quiosque e aceita toda a faixa de senhas permitida pelo instalador. O patchelf do Buildroot entra no host de build e ajusta o interpretador do greetd e do auxiliar `unix_chkpwd` do Linux-PAM. Somente root pode executar o auxiliar no sistema instalado.
+
+## Download HTTPS de atualizações do PC
+
+Use um build `BOARD=pc` com o certificado público descartável em `MELKOR_RAUC_KEYRING`. Gere o disco virtual no mesmo `OUT` passando `PC_CREDENTIALS` com os hashes da senha descartável de root e da conta comum. O teste requer Python 3.11+, QEMU, OVMF, OpenSSL e `mke2fs`.
+
+```sh
+make test-update-https OUT=out/pc-https CERT="$lab/cert.pem" KEY="$lab/key.pem" \
+    ROOT_PASSWORD_FILE="$lab/senha-root"
+```
+
+O executor abre um servidor TLS em loopback e usa uma cópia do disco com rede virtual. O caso de assinatura adulterada usa o SHA-256 do arquivo adulterado para verificar a rejeição pelo RAUC mesmo após validar o download. O teste confere que certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida preservam a ordem do GRUB e o slot inativo. O bundle válido promove B. O segundo boot confirma B e lê o documento salvo em A. Os logs seriais ficam em `OUT/https-tests/`.
+
+## Canal de atualizações do PC
+
+Prepare dois builds PC no mesmo ambiente de laboratório, com `MELKOR_CORE_REVISION=1` e `MELKOR_CORE_REVISION=2`, `MELKOR_RAUC_KEYRING` apontando para o certificado descartável e `MELKOR_CHANNEL_PUBLIC_KEY` apontando para a chave pública do canal. Gere o par descartável com `openssl genpkey -algorithm ED25519` e exporte a pública em PEM com `openssl pkey -pubout`. Prepare o disco virtual com credenciais no diretório do build da revisão 1.
+
+```sh
+make test-channel-pc OUT=out/pc-1 CERT="$lab/cert.pem" KEY="$lab/key.pem" \
+    ROOT_PASSWORD_FILE="$lab/senha-root" CHANNEL_KEY="$lab/channel.key" \
+    CHANNEL_CANDIDATE="$PWD/out/pc-2/build/images/rootfs.squashfs"
+```
+
+O executor verifica a configuração de fábrica, seleciona um servidor alternativo, recusa a assinatura adulterada e instala a revisão 2 com `melkor-core-update`. Após reiniciar em B, a troca de canal permanece, a revisão instalada é reconhecida como atual e o reset restaura o endereço de fábrica. Os testes Go rejeitam também manifestos expirados, revisões anteriores, URLs HTTP e respostas maiores que o limite.
+
+Os builds oficiais recebem os arquivos públicos versionados em `core/board/pc/keys/` por `MELKOR_RAUC_KEYRING` e `MELKOR_CHANNEL_PUBLIC_KEY`. Compare os PEM dentro do SquashFS com esses arquivos antes de gerar a ISO. Use as chaves e os certificados de laboratório nos testes automatizados de atualização, que também usam o certificado de teste para servir HTTPS.
+
+A edição de console usa `make image BOARD=pc OUT=out/pc-minimal` com a revisão e as chaves da release. Monte a mídia com `make installer-iso PC_OUT=out/pc-minimal OUT=out/installer` e execute `make test-installer OUT=out/installer`. O alvo mínimo mantém a geometria do PC, as contas, o armazenamento de Wi-Fi e a compatibilidade RAUC. Gere o bundle de desktop com `make bundle-pc` sobre o build completo.
+
+### Canal do desktop
+
+No Netlify, importe o repositório `wkoch/Melkor`, selecione `main` como branch de produção após a integração da configuração, deixe o comando de build vazio e use `publicacao` como diretório de publicação. Vincule `melkor.wkoch.com.br` nas configurações de domínio. O Netlify publica o manifesto estático quando esse arquivo entra na branch de produção.
+
+Prepare a geração do desktop com `MELKOR_CORE_REVISION=2` para uma base de revisão 1. Gere e assine o bundle usando `make bundle-pc`. Após confirmar a distribuição do conteúdo, envie o bundle para uma release versionada de `wkoch/Melkor` e confira que o download HTTPS funciona. No ambiente de assinatura, execute:
+
+```sh
+make channel-pc CHANNEL_DESKTOP=1 OUT=out/pc-desktop VERSION=VERSAO \
+  KEYRING=/caminho/rauc.pem CHANNEL_KEY=/caminho/channel.key BUNDLE_URL=URL_HTTPS_DA_RELEASE
+mkdir -p publicacao/canal
+cp out/pc-desktop/melkor-pc-desktop.json publicacao/canal/
+```
+
+Publique somente o JSON nessa pasta. A chave de assinatura fica no ambiente de assinatura. O assinador verifica a geração dentro do bundle RAUC e exige a presença do serviço de login gráfico. O cliente exige o campo assinado `profile=desktop` para finalizar pela rede. O teste Go abre um servidor TLS local, valida o manifesto e o hash do bundle e testa o isolamento em relação ao canal de atualização da base.
+
+Publique a ISO, seu SHA-256 e o bundle gerado por `make bundle-pc` na release versionada de `wkoch/Melkor`. Cada arquivo de uma release precisa ter menos de 2 GiB. [Limites do GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)
+
+Depois de conferir o download do bundle sem autenticação, execute `make channel-pc` com o mesmo `OUT`, `VERSION` e `KEYRING`. Em `BUNDLE_URL`, passe a URL HTTPS do bundle na tag versionada. Envie somente o `melkor-pc-channel.json` assinado à release `pc-stable` do mesmo repositório. Essa release precisa aceitar a substituição do manifesto nas próximas publicações. Renove-o antes da validade de 90 dias ou ajuste `CHANNEL_DAYS`. Use a chave privada do canal só no ambiente de assinatura.
+
+### Contas locais do PC
+
+O gerador de discos virtuais aceita `PC_CREDENTIALS` como caminho para um arquivo regular de modo `0600` com duas linhas, `root:<hash>` e `melkor:<hash>`. Cada hash usa SHA-512 crypt, como na saída de `openssl passwd -6`. O build fornece `fakeroot` para que `mke2fs` grave os metadados de propriedade na imagem. O arquivo de hashes e as senhas descartáveis ficam fora do Git.
+
+Com um build PC pronto em `out/pc` e sem um `melkor-pc.img` nessa saída, gere um novo disco e teste as contas em QEMU.
+
+```sh
+umask 077
+lab=$(mktemp -d "$PWD/out/pc-contas.XXXXXX")
+openssl rand -hex 16 > "$lab/senha-root"
+openssl rand -hex 16 > "$lab/senha-melkor"
+{
+    printf 'root:'
+    openssl passwd -6 -stdin < "$lab/senha-root"
+    printf 'melkor:'
+    openssl passwd -6 -stdin < "$lab/senha-melkor"
+} > "$lab/credenciais"
+make pc-disk PC_CREDENTIALS="$lab/credenciais"
+make test-pc-disk PC_ROOT_PASSWORD_FILE="$lab/senha-root" PC_USER_PASSWORD_FILE="$lab/senha-melkor"
+```
+
+O teste rejeita a senha de laboratório antiga, autentica o usuário comum e confirma a proteção do shadow e do arquivo persistente. Em seguida, autentica `su -` com a senha separada de root. O fluxo se repete após a troca de slot e verifica o documento e o swap.
+
 ## Protótipo A/B do M1
 
 Execute `make check-m1` com a imagem já gerada, Python, `sfdisk` e `blkid`. A verificação inspeciona o GPT, os quatro sistemas de arquivos, o estado inicial do GRUB, a associação entre os `PARTUUIDs` e os slots do RAUC, os kernels e o UUID usado para montar os dados. Ela lê o arquivo de disco sem criar dispositivos de bloco no host.
 
-Execute `make test-boot BOARD=m1` com QEMU e OVMF. O teste cria uma cópia gravável do disco. Em A, faz login, grava um documento no home e sincroniza o disco. Em seguida, inicia outra VM com o mesmo disco e as mesmas variáveis UEFI, confirma que B está realçado no menu do GRUB antes de iniciar e confere o conteúdo. Os logs ficam em `serial-a.log` e `serial-b.log`, junto de `result.json`.
+Execute `make test-boot BOARD=m1` com QEMU e OVMF. O teste cria uma cópia gravável do disco. Em A, faz login, grava um documento no home e sincroniza o disco. Em seguida, inicia outra VM com o mesmo disco e as mesmas variáveis UEFI, confirma que B está realçado no menu do GRUB antes de iniciar e confere o conteúdo. Os logs ficam em `serial-a.log` e `serial-b.log`, junto de `result.json`. As sondas coletam cada valor antes de emitir sua linha no console. A regressão injeta uma mensagem assíncrona durante a coleta e verifica os campos completos.
 
 A imagem de fábrica contém a mesma geração nos dois slots. Esse teste verifica a seleção manual e a persistência.
 

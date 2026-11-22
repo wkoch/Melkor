@@ -1,0 +1,3 @@
+type = scripted
+command = /usr/libexec/melkor-pc-persist
+depends-on = pc-storage
