@@ -16,7 +16,7 @@ func TestAjudaEValidacao(t *testing.T) {
 	if err := run(ctx, nil, io.Discard); err == nil || !strings.Contains(err.Error(), "-saida") {
 		t.Fatalf("opções ausentes: %v", err)
 	}
-	args := []string{"-saida", "x.img", "-core", "x", "-sha256", "x", "-efi", "x", "-grub", "x"}
+	args := []string{"-saida", "x.img", "-core", "x", "-sha256", "x", "-efi", "x"}
 	if err := run(ctx, append(args, "-gib", "18446744073709551615"), io.Discard); err == nil || !strings.Contains(err.Error(), "limite") {
 		t.Fatalf("capacidade fora do limite: %v", err)
 	}

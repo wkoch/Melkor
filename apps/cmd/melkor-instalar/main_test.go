@@ -11,6 +11,24 @@ import (
 	"melkor.local/apps/internal/pcdisk"
 )
 
+func TestAguardaComandoInstalarCore(t *testing.T) {
+	for _, test := range []struct {
+		input string
+		ok    bool
+	}{
+		{"instalar core\n", true},
+		{"APAGAR\ninstalar pacote noctalia\ninstalar core\r\n", true},
+		{"instalar core extra\ninstalar core", false},
+		{"", false},
+	} {
+		var output bytes.Buffer
+		err := waitForInstallCommand(bufio.NewReader(strings.NewReader(test.input)), &output)
+		if (err == nil) != test.ok || !strings.Contains(output.String(), "Digite instalar core") {
+			t.Fatalf("entrada %q: saída %q, erro %v", test.input, &output, err)
+		}
+	}
+}
+
 func TestSelecionaSomenteDiscoConfirmadoPeloNumero(t *testing.T) {
 	disks := []pcdisk.Disk{{ID: "nvme-segundo", Bytes: 13 * pcdisk.GiB, Sector: 512},
 		{ID: "nvme-principal", Model: "SSD", Bytes: 16 * pcdisk.GiB, Sector: 512}}

@@ -141,21 +141,18 @@ def login(console, user, password, prompt):
     console.expect(prompt, "shell do convidado")
 
 
+def limine_entry(console, direction):
+    ansi = rb"(?:\x1b\[[0-?]*[ -/]*[@-~])*"
+    menu_ready = ansi.join(re.escape(bytes([char])) for char in b"ENTER Boot")
+    console.expect(menu_ready, "menu do Limine")
+    console.send(direction, end=b"")
+    console.send(b"")
+
+
 def check_console(process, log, timeout, slot=None, pc=False, credentials=None):
     with serial_console(process, log, timeout) as console:
         if slot == "B":
-            label = b"Melkor Linux PC - slot " if pc else b"Melkor Linux M1 - slot "
-            selection = console.expect(rb"\*" + label + rb"[AB]", "menu de slots do GRUB")
-            # A primeira marca aparece durante o desenho. Aguarde a contagem quando existir.
-            console.expect(rb"The highlighted entry will be executed automatically in",
-                           "contagem opcional do GRUB", wait=1)
-            if selection.endswith(b"*" + label + b"A"):
-                console.send(b"\x1b[B", end=b"")
-                selection = console.expect(rb"\*" + label + rb"B|Booting `" + label + rb"A'",
-                                           "seleção do slot B no GRUB")
-                if not selection.endswith(b"*" + label + b"B"):
-                    raise RuntimeError("O GRUB iniciou o slot A antes de confirmar a seleção de B.")
-            console.send(b"")
+            limine_entry(console, b"\x1b[B")
 
         if credentials:
             console.expect(rb"^\r?melkor login: ?", "prompt antes de testar a credencial antiga")

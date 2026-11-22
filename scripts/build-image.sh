@@ -63,7 +63,7 @@ else
     "${buildroot_make[@]}" "melkor_${board}_defconfig"
 fi
 for option in BR2_TOOLCHAIN_BUILDROOT_MUSL BR2_GCC_VERSION_14_X BR2_INIT_NONE \
-    BR2_PACKAGE_DINIT BR2_TARGET_GRUB2_X86_64_EFI "$rootfs_option" \
+    BR2_PACKAGE_DINIT BR2_PACKAGE_HOST_MELKOR_LIMINE "$rootfs_option" \
     BR2_DOWNLOAD_FORCE_CHECK_HASHES; do
     if ! grep -Fxq "$option=y" "$build/.config"; then
         echo "O Buildroot não ativou $option." >&2

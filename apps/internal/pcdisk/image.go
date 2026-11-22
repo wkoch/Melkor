@@ -19,7 +19,6 @@ type ImageInput struct {
 	Core        string
 	CoreSHA256  string
 	EFI         string
-	GRUB        string
 	Credentials string
 }
 
@@ -50,7 +49,7 @@ func createImage(ctx context.Context, input ImageInput, sector uint64, fakeRoot 
 	if err != nil {
 		return Layout{}, err
 	}
-	esp, err := createESP(ctx, input, layout, work)
+	esp, err := createESP(ctx, input, layout, work, core.Name())
 	if err != nil {
 		return Layout{}, err
 	}
@@ -165,38 +164,35 @@ func stageCore(input ImageInput, work string) (*os.File, error) {
 	return staged, nil
 }
 
-func createESP(ctx context.Context, input ImageInput, layout Layout, work string) (*os.File, error) {
-	config, err := os.ReadFile(input.GRUB)
-	if err != nil {
-		return nil, err
-	}
-	script := string(config)
-	for index, token := range []string{"@CORE_A@", "@CORE_B@"} {
-		if strings.Count(script, token) != 1 {
-			return nil, fmt.Errorf("modelo GRUB deve conter exatamente uma ocorrência de %s", token)
-		}
-		script = strings.Replace(script, token, layout.Partitions[index+1].UUID, 1)
-	}
+func createESP(ctx context.Context, input ImageInput, layout Layout, work, core string) (*os.File, error) {
 	bootDir := filepath.Join(work, "EFI", "BOOT")
 	if err := os.MkdirAll(bootDir, 0o700); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(bootDir, "grub.cfg"), []byte(script), 0o600); err != nil {
+	config := "timeout: 3\nserial: yes\n"
+	for i, slot := range []string{"A", "B"} {
+		config += fmt.Sprintf("/%s\n    protocol: linux\n    path: boot():/EFI/BOOT/%s\n"+
+			"    cmdline: root=PARTUUID=%s rootfstype=squashfs rootwait ro console=tty0 console=ttyS0,115200n8 init=/sbin/dinit rauc.slot=%s\n",
+			BootEntry(slot), KernelName(slot), layout.Partitions[i+1].UUID, slot)
+	}
+	if err := os.WriteFile(filepath.Join(bootDir, "limine.conf"), []byte(config), 0o600); err != nil {
 		return nil, err
 	}
 	efi, err := os.ReadFile(input.EFI)
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(bootDir, "bootx64.efi"), efi, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(bootDir, "BOOTX64.EFI"), efi, 0o600); err != nil {
 		return nil, err
 	}
-	state := filepath.Join(bootDir, "grubenv")
-	if err := run(ctx, "", "grub-editenv", state, "create"); err != nil {
+	kernel, err := ReadKernel(ctx, core)
+	if err != nil {
 		return nil, err
 	}
-	if err := run(ctx, "", "grub-editenv", state, "set", "ORDER=A B", "A_OK=1", "A_TRY=0", "B_OK=0", "B_TRY=0"); err != nil {
-		return nil, err
+	for _, slot := range []string{"A", "B"} {
+		if err := os.WriteFile(filepath.Join(bootDir, KernelName(slot)), kernel, 0o600); err != nil {
+			return nil, err
+		}
 	}
 	esp, err := os.OpenFile(filepath.Join(work, "esp.vfat"), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
 	if err != nil {

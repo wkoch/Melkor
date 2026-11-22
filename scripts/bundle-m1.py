@@ -11,9 +11,9 @@ import sys
 import tempfile
 
 
-COMPATIBLE = "melkor-m1-x86_64"
+COMPATIBLE = "melkor-m1-limine-x86_64"
 SLOT_SIZE = 128 * 1024 * 1024
-PC_COMPATIBLE = "melkor-pc-x86_64"
+PC_COMPATIBLE = "melkor-pc-limine-x86_64"
 PC_SLOT_SIZE = 2 * 1024 * 1024 * 1024
 
 

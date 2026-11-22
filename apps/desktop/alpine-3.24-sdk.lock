@@ -392,3 +392,7 @@ d42775b045a373c610f1fa06ea4eded68d4096d446dfe87ab4b6ce0836c5823d https://codeloa
 b101d3185a32a3aa386f688cea5efc78078b58c25f54dd1185e32e6a7c1baaa3 main libarchive-dev-3.8.11-r0.apk
 3ad4912ab8ecf5f6236fdb751f88243006b3a8f152684e455b781e16284dd298 main lz4-libs-1.10.0-r1.apk
 c19c3e0ebd4712c13e92167206aa3eb4d2a11a7d19277779527e11a7583916df https://codeload.github.com/noctalia-dev/luciole/tar.gz/bae75c541ce1d863438d013f1f157b0db85e87df luciole-bae75c5.tar.gz
+1a4990f696d6072142addef12773242f01fcb50c22d29bfe94e0fb5482e28896 community mold-2.39.1-r0.apk
+78ead288ec6c0056ea973da9b74faa86b77c3d3dd62e93e1ac44e120249eb960 community mimalloc2-2.2.7-r0.apk
+41acb3d9571507db0a4d0aea9fcc1d8af021c3f8fb390109641942d305c401d7 community onetbb-2022.3.0-r1.apk
+beb558251a4fdbf4db63f28aa36be3cda7f93b6381b9e93ae028375fdef11ae4 main hwloc-2.12.2-r0.apk

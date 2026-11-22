@@ -29,7 +29,7 @@ installer = script("installer-iso")
 
 LOGIN = b"\rmelkor login: \n\rPassword: \nmelkor$ \n"
 PROBE = b"M0-ID=melkor\nM0-PID1=dinit\nM0-LOGIN=melkor\nM0-UEFI=yes\nM0-ROOT=squashfs,ro\nM0-END\n"
-MENU = b"Melkor Linux M1 - slot B\nPress enter to boot the selected OS\n*Melkor Linux M1 - slot A\n"
+MENU = b"Limine\nE\x1b[35;2HNTER Boot\n"
 LIVE = (b"LIVE-VERSION=live\nLIVE-USER=ok\nLIVE-DISPLAY=ok\nLIVE-DEVICES=ok\n"
         b"LIVE-PERMISSIONS=ok\nLIVE-TOOLS=ok\nLIVE-RAM=ok\nLIVE-HOME=ok\nLIVE-END\n"
         b"LIVE-FIRMWARE=ok\nLIVE-REGDB=ok\nLIVE-IWD=ok\nLIVE-WIFI-END\n")
@@ -49,12 +49,12 @@ class InstallerMediaTest(unittest.TestCase):
                 installer.prepare_media(root, root, root / "install.iso")
             run.assert_not_called()
 
-    def test_midia_monta_payload_grub_e_publica_sem_sobrescrever(self):
+    def test_midia_monta_limine_e_payload_do_disco_sem_sobrescrever(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
             for mode, files in {
                 "installer": {"bzImage": b"kernel", "rootfs.cpio.gz": b"initramfs"},
-                "pc": {"rootfs.squashfs": b"core", "efi-part/EFI/BOOT/bootx64.efi": b"grub-pc"},
+                "pc": {"rootfs.squashfs": b"core", "efi-part/EFI/BOOT/bootx64.efi": b"limine-pc"},
             }.items():
                 output = root / mode
                 hashes = []
@@ -65,12 +65,19 @@ class InstallerMediaTest(unittest.TestCase):
                     hashes.append(f"{hashlib.sha256(contents).hexdigest()}  {name}\n")
                 (output / "SHA256SUMS").write_text("".join(hashes))
 
+            limine = root / "installer/build/host/share/melkor-limine"
+            limine.mkdir(parents=True)
+            for name in ("BOOTX64.EFI", "LICENSE", "3RDPARTY.md"):
+                (limine / name).write_text(name)
+
             def tool(args, **options):
                 if args[0] == "cpio":
                     self.assertIn(b"melkor/core.sha256", options["input"])
                     options["stdout"].write(b"payload")
                 elif Path(args[0]).name == "xorriso":
                     self.assertIn("MELKOR_INSTALL_x86_64", args)
+                    self.assertEqual((Path(args[-1]) / "EFI/BOOT/BOOTX64.EFI").read_text(), "BOOTX64.EFI")
+                    self.assertIn("protocol: linux", (Path(args[-1]) / "EFI/BOOT/limine.conf").read_text())
                     self.assertTrue((Path(args[-1]) / "rootfs.cpio.gz").read_bytes().startswith(b"initramfs"))
                     Path(args[args.index("-o") + 1]).write_bytes(b"iso")
 
@@ -108,7 +115,7 @@ class BundleTest(unittest.TestCase):
         content, candidate = command[-2:]
         self.assertEqual((content / self.source.name).read_bytes(), self.source.read_bytes())
         self.assertEqual((content / "manifest.raucm").read_text(),
-                         "[update]\ncompatible=melkor-m1-x86_64\nversion=1.0\n\n"
+                         "[update]\ncompatible=melkor-m1-limine-x86_64\nversion=1.0\n\n"
                          "[bundle]\nformat=verity\n\n[image.rootfs]\nfilename=rootfs.squashfs\n")
         candidate.write_bytes(b"bundle de teste")
 
@@ -130,7 +137,7 @@ class BundleTest(unittest.TestCase):
         with patch.object(sys, "argv", argv), patch.object(bundle, "create_bundle") as create:
             with redirect_stdout(io.StringIO()):
                 self.assertEqual(bundle.main(), 0)
-        self.assertEqual(create.call_args.args[-2:], ("melkor-pc-x86_64", 2 * 1024 ** 3))
+        self.assertEqual(create.call_args.args[-2:], ("melkor-pc-limine-x86_64", 2 * 1024 ** 3))
 
     def test_recusa_entradas_invalidas_e_limpa_assinatura_incompleta(self):
         with self.assertRaisesRegex(ValueError, "versão"):
@@ -185,20 +192,16 @@ class SerialTest(unittest.TestCase):
     def test_slot_b_selecionado_e_documento_reaberto(self):
         persist = (b"\nM1-VERSION=m1\nM1-SLOT=rauc.slot=B\nM1-DATA=rw,nosuid\n"
                    b"M1-DOCUMENT=melkor-m1-persistencia\nM1-END\n")
-        for timer in (b"", b"The highlighted entry will be executed automatically in 3s.\n"):
-            with console(MENU + timer + b"*Melkor Linux M1 - slot B\n" + LOGIN + PROBE + persist) as process:
-                boot.check_console(process, io.BytesIO(), timeout=1, slot="B")
-                self.assertTrue(process.stdin.getvalue().startswith(b"\x1b[B\rmelkor\r"))
-                self.assertNotIn(boot.WRITE_DOCUMENT.encode(), process.stdin.getvalue())
-        with console(b"*Melkor Linux M1 - slot B\n" + LOGIN + PROBE + persist) as process:
+        with console(MENU + LOGIN + PROBE + persist) as process:
             boot.check_console(process, io.BytesIO(), timeout=1, slot="B")
-            self.assertTrue(process.stdin.getvalue().startswith(b"\rmelkor\r"))
+            self.assertTrue(process.stdin.getvalue().startswith(b"\x1b[B\rmelkor\r"))
+            self.assertNotIn(boot.WRITE_DOCUMENT.encode(), process.stdin.getvalue())
 
-    def test_slot_b_exige_confirmacao_antes_de_enviar_enter(self):
-        with console(MENU + b"Booting `Melkor Linux M1 - slot A'\n") as process:
-            with self.assertRaisesRegex(RuntimeError, "antes de confirmar"):
+    def test_slot_b_aguarda_menu_antes_de_enviar_teclas(self):
+        with console(LOGIN) as process:
+            with self.assertRaisesRegex(RuntimeError, "menu do Limine"):
                 boot.check_console(process, io.BytesIO(), timeout=1, slot="B")
-            self.assertEqual(process.stdin.getvalue(), b"\x1b[B")
+            self.assertEqual(process.stdin.getvalue(), b"")
 
     def test_disco_pc_exige_arquivo_swap(self):
         persist = (b"\nM1-VERSION=pc\nM1-SLOT=rauc.slot=A\nM1-DATA=rw,nosuid\n"
@@ -432,8 +435,15 @@ class ImageCheckTest(unittest.TestCase):
             self.table["partitions"].append(dict(name=name, start=start, size=size, type=ptype, uuid=f"slot-{index}"))
             self.types[start * 512] = fstype
             start += size
-        self.grub = "melkor_boot 2 slot-1 A\nmelkor_boot 3 slot-2 B"
-        self.grubenv = ("# GRUB Environment Block\nORDER=A B\nA_OK=1\nA_TRY=0\nB_OK=0\nB_TRY=0\n").ljust(1024, "#")
+        self.limine = "".join(
+            f"/Melkor Linux - slot {slot}\n    path: boot():/EFI/BOOT/kernel-{slot}\n"
+            f"    cmdline: root=PARTUUID=slot-{i} ro rauc.slot={slot}\n"
+            for i, slot in enumerate(("A", "B"), start=1)
+        ).encode()
+        loader = self.build / "host/share/melkor-limine/BOOTX64.EFI"
+        loader.parent.mkdir(parents=True)
+        loader.write_bytes(b"efi")
+        (self.build / "images/bzImage").write_bytes(b"kernel")
         self.persist = f"mount -t ext4 UUID={self.uuid} /persist"
         self.setup = "slot-0 slot-1 slot-2"
         self.rauc = "bundle-formats=verity\n"
@@ -444,32 +454,32 @@ class ImageCheckTest(unittest.TestCase):
             "upstream": [image.quad9_stamp(address) for address in image.QUAD9_ADDRESSES],
         })
 
-    def command(self, argv, text):
-        self.assertTrue(text)
+    def command(self, argv, text=False):
         if argv[:2] == ("sfdisk", "--json"):
             return json.dumps({"partitiontable": self.table})
         if argv[0] == "blkid":
             return f"TYPE={self.types[int(argv[5])]}\nUUID={self.uuid}\n"
-        self.assertEqual(argv[0], self.build / "host/bin/grub-fstest")
-        if argv[4] == "cmp":
-            return ""
+        if argv[0] == self.build / "host/bin/mtype":
+            self.assertFalse(text)
+            return {"BOOTX64.EFI": b"efi", "limine.conf": self.limine,
+                    "kernel-A": b"kernel", "kernel-B": b"kernel"}[Path(argv[-1]).name]
+        self.assertTrue(text)
+        self.assertEqual(argv[0], self.build / "host/bin/unsquashfs")
         return {
-            "/EFI/BOOT/grub.cfg": self.grub,
-            "/EFI/BOOT/grubenv": self.grubenv,
             "/etc/os-release": 'VERSION_ID="m1"',
             "/usr/libexec/melkor-persist": self.persist,
             "/usr/libexec/melkor-rauc-setup": self.setup,
             "/etc/rauc/system.conf": self.rauc,
             "/etc/resolv.conf": self.resolver,
             "/etc/dnsproxy.json": self.dns,
-        }[argv[5]]
+        }[argv[-1]]
 
     def test_valida_gpt_slots_e_persistencia(self):
         with patch.object(image.subprocess, "check_output", side_effect=self.command) as capture, \
              patch.object(image.subprocess, "run") as run:
             image.check(self.build)
             run.assert_called_once_with(["sfdisk", "--verify", self.build / "images/melkor-m1.img"], check=True)
-        self.assertEqual(sum(call.args[0][4:6] == ("cmp", "/boot/bzImage") for call in capture.call_args_list), 2)
+        self.assertEqual(sum(call.args[0][-1] in ("::/EFI/BOOT/kernel-A", "::/EFI/BOOT/kernel-B") for call in capture.call_args_list), 2)
 
     def test_rejeita_particao_ou_slot_invalido(self):
         with patch.object(image.subprocess, "check_output", side_effect=self.command), \
@@ -484,14 +494,14 @@ class ImageCheckTest(unittest.TestCase):
             with patch.dict(self.types, {start * 512: "ext4"}):
                 with self.assertRaisesRegex(ValueError, "Sistema de arquivos"):
                     image.check(self.build)
-            with patch.object(self, "grub", "melkor_boot 2 slot-2 A\nmelkor_boot 3 slot-1 B"):
+            with patch.object(self, "limine", self.limine.replace(b"slot-1", b"slot-2")):
                 with self.assertRaisesRegex(ValueError, "PARTUUID"):
                     image.check(self.build)
             with patch.object(self, "persist", "mount -t ext4 UUID=outro /persist"):
                 with self.assertRaisesRegex(ValueError, "UUID"):
                     image.check(self.build)
-            with patch.object(self, "grubenv", self.grubenv.replace("B_OK=0", "B_OK=1")):
-                with self.assertRaisesRegex(ValueError, "Estado inicial"):
+            with patch.object(self, "limine", b"/Melkor Linux - slot B\n"):
+                with self.assertRaisesRegex(ValueError, "Ordem inicial"):
                     image.check(self.build)
             with patch.object(self, "setup", "slot-1 slot-2"):
                 with self.assertRaisesRegex(ValueError, "ESP"):

@@ -49,6 +49,7 @@ tar --exclude=./var/cache/apt --exclude=./var/lib/apt/lists --exclude='./dev/*' 
 BUILD_SESSION = r"""
 apk --no-network --repositories-file /dev/null --no-progress add --force-non-repository /packages/*.apk
 export TMPDIR=/work
+export CC_LD=mold CXX_LD=mold
 mkdir -p /usr/include/stb
 for header in /usr/include/stb_*.h; do ln -s "$header" /usr/include/stb/; done
 mkdir /work/src-noctalia /work/src-umbriel /work/src-noctalia-greeter /work/src-luciole
@@ -58,18 +59,14 @@ tar -xzof /packages/noctalia-greeter-1.7.1.tar.gz -C /work/src-noctalia-greeter 
 (cd /work/src-noctalia-greeter && patch -p1 < /packages/noctalia-greeter-protocol-headers.patch)
 tar -xzof /packages/luciole-bae75c5.tar.gz -C /work/src-luciole --strip-components=1
 meson setup /work/build-umbriel /work/src-umbriel --prefix=/opt/melkor-desktop/usr \
-    --buildtype=release -Dtests=disabled -Djemalloc=disabled -Dlocaled=disabled
+    --buildtype=release -Db_lto=true -Dtests=disabled -Djemalloc=disabled -Dlocaled=disabled
+# GCC 15.2 falha no LTO de Shell e Luciole ao combinar std::to_string e fortify.
 meson setup /work/build-noctalia /work/src-noctalia --prefix=/opt/melkor-desktop/usr \
-    --buildtype=release -Dtests=disabled -Djemalloc=disabled
+    --buildtype=release -Db_lto=false -Dtests=disabled -Djemalloc=disabled
 meson setup /work/build-noctalia-greeter /work/src-noctalia-greeter --prefix=/opt/melkor-desktop/usr \
-    --buildtype=release
+    --buildtype=release -Db_lto=true
 meson setup /work/build-luciole /work/src-luciole --prefix=/opt/melkor-desktop/usr \
-    --buildtype=release -Dtests=disabled -Dbuild_revision=bae75c541ce1d863438d013f1f157b0db85e87df
-for app in umbriel noctalia luciole; do
-    meson compile -C "/work/build-$app" -j 6
-    meson install -C "/work/build-$app" --destdir /work/stage --no-rebuild
-    install -Dm644 "/work/src-$app/LICENSE" "/work/stage/opt/melkor-desktop/usr/share/licenses/$app/LICENSE"
-done
+    --buildtype=release -Db_lto=false -Dtests=disabled -Dbuild_revision=bae75c541ce1d863438d013f1f157b0db85e87df
 # O Cage é o compositor da tela de login. Instale o cliente e seus ativos.
 meson compile -C /work/build-noctalia-greeter -j 6 noctalia-greeter
 prefix=/work/stage/opt/melkor-desktop/usr
@@ -79,6 +76,11 @@ mkdir -p "$prefix/share/noctalia-greeter"
 cp -a "$greeter/assets" "$prefix/share/noctalia-greeter/"
 install -Dm644 "$greeter/LICENSE" "$prefix/share/licenses/noctalia-greeter/LICENSE"
 install -Dm644 "$greeter/third_party/wuffs/LICENSE-MIT" "$prefix/share/licenses/noctalia-greeter/Wuffs-LICENSE-MIT"
+for app in umbriel noctalia luciole; do
+    meson compile -C "/work/build-$app" -j 6
+    meson install -C "/work/build-$app" --destdir /work/stage --no-rebuild
+    install -Dm644 "/work/src-$app/LICENSE" "/work/stage/opt/melkor-desktop/usr/share/licenses/$app/LICENSE"
+done
 tar -C /work/stage/opt/melkor-desktop -czf /work/layer.tar.gz usr
 """
 

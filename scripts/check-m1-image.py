@@ -48,7 +48,7 @@ def check(build):
     images = build / "images"
     image = images / "melkor-m1.img"
     require(image.is_file(), f"Disco virtual ausente: {image}. Execute make image BOARD=m1.")
-    grub = build / "host/bin/grub-fstest"
+    host = build / "host/bin"
 
     table = json.loads(capture("sfdisk", "--json", image))["partitiontable"]
     names = [partition["name"] for partition in table["partitions"]]
@@ -72,34 +72,40 @@ def check(build):
         require(properties.get("TYPE") == filesystem, f"Sistema de arquivos inesperado em {name}.")
         filesystems.append(properties)
 
-    def on_partition(index, *command):
-        return capture(grub, "-r", f"loop0,gpt{index}", image, *command)
+    def esp_file(name):
+        offset = table["partitions"][0]["start"] * sector_size
+        return subprocess.check_output([host / "mtype", "-i", f"{image}@@{offset}", f"::/EFI/BOOT/{name}"])
 
-    on_partition(1, "cmp", "/EFI/BOOT/bootx64.efi", images / "efi-part/EFI/BOOT/bootx64.efi")
-    config = on_partition(1, "cat", "/EFI/BOOT/grub.cfg")
-    config_lines = {line.strip() for line in config.splitlines()}
-    initial = on_partition(1, "cat", "/EFI/BOOT/grubenv")
-    variables = [line for line in initial.splitlines() if not line.startswith("#")]
-    require(len(initial) == 1024 and initial.startswith("# GRUB Environment Block\n")
-            and variables == ["ORDER=A B", "A_OK=1", "A_TRY=0", "B_OK=0", "B_TRY=0"],
-            "Estado inicial do GRUB inválido.")
+    def on_partition(index, name):
+        offset = table["partitions"][index - 1]["start"] * sector_size
+        return capture(host / "unsquashfs", "-offset", str(offset), "-cat", image, name)
+
+    require(esp_file("BOOTX64.EFI") == (build / "host/share/melkor-limine/BOOTX64.EFI").read_bytes(),
+            "Carregador EFI Limine inválido.")
+    config = esp_file("limine.conf").decode("utf-8")
+    entries = config.split("/Melkor Linux - slot ")
+    require(len(entries) == 3 and entries[1].startswith("A\n") and entries[2].startswith("B\n"),
+            "Ordem inicial de entradas Limine inválida.")
+    kernel = (images / "bzImage").read_bytes()
     partuuids = [partition["uuid"].lower() for partition in table["partitions"][:3]]
     data_uuid = filesystems[3]["UUID"]
     for index, slot in enumerate(("A", "B"), start=2):
         partuuid = partuuids[index - 1]
-        require(f"melkor_boot {index} {partuuid} {slot}" in config_lines,
-                f"O GRUB precisa apontar o slot {slot} para o seu PARTUUID.")
-        on_partition(index, "cmp", "/boot/bzImage", images / "bzImage")
-        require('VERSION_ID="m1"' in on_partition(index, "cat", "/etc/os-release").splitlines(),
+        entry = entries[index - 1]
+        require(f"root=PARTUUID={partuuid} " in entry and f"rauc.slot={slot}\n" in entry
+                and f"path: boot():/EFI/BOOT/kernel-{slot}\n" in entry,
+                f"O Limine precisa apontar o slot {slot} para o seu PARTUUID.")
+        require(esp_file(f"kernel-{slot}") == kernel, f"Kernel inválido no slot {slot}.")
+        require('VERSION_ID="m1"' in on_partition(index, "/etc/os-release").splitlines(),
                 f"Identidade M1 ausente no slot {slot}.")
-        require(f"UUID={data_uuid} /persist" in on_partition(index, "cat", "/usr/libexec/melkor-persist"),
+        require(f"UUID={data_uuid} /persist" in on_partition(index, "/usr/libexec/melkor-persist"),
                 f"O slot {slot} precisa montar a partição de dados pelo UUID de filesystem.")
-        setup = on_partition(index, "cat", "/usr/libexec/melkor-rauc-setup")
+        setup = on_partition(index, "/usr/libexec/melkor-rauc-setup")
         require(all(uuid in setup for uuid in partuuids),
                 f"O RAUC no slot {slot} precisa localizar a ESP e os slots pelos PARTUUIDs da imagem.")
-        require("bundle-formats=verity" in on_partition(index, "cat", "/etc/rauc/system.conf").splitlines(),
+        require("bundle-formats=verity" in on_partition(index, "/etc/rauc/system.conf").splitlines(),
                 f"O RAUC no slot {slot} deve exigir bundles no formato verity.")
-        check_dns(on_partition(index, "cat", "/etc/resolv.conf"), on_partition(index, "cat", "/etc/dnsproxy.json"))
+        check_dns(on_partition(index, "/etc/resolv.conf"), on_partition(index, "/etc/dnsproxy.json"))
 
 
 def main():

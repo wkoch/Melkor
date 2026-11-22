@@ -22,7 +22,7 @@ def sign(build, bundle, keyring, key, url, days, desktop=False):
     if days < 1:
         raise ValueError("Informe a validade do manifesto em dias.")
     host = build / "host/bin"
-    target = "melkor-pc-x86_64"
+    target = "melkor-pc-limine-x86_64"
     with TemporaryDirectory(prefix="melkor-channel-") as directory:
         work = Path(directory)
         verified = work / "bundle.raucb"
