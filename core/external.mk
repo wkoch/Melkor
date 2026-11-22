@@ -1,3 +1,6 @@
+include $(BR2_EXTERNAL_MELKOR_PATH)/package/melkor-boot/melkor-boot.mk
+include $(BR2_EXTERNAL_MELKOR_PATH)/package/melkor-mold/melkor-mold.mk
+include $(BR2_EXTERNAL_MELKOR_PATH)/package/melkor-limine/melkor-limine.mk
 include $(BR2_EXTERNAL_MELKOR_PATH)/package/dinit/dinit.mk
 include $(BR2_EXTERNAL_MELKOR_PATH)/package/dnsproxy/dnsproxy.mk
 include $(BR2_EXTERNAL_MELKOR_PATH)/package/melkor-dhcpcd/melkor-dhcpcd.mk

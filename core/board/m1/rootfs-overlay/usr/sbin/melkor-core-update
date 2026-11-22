@@ -8,7 +8,13 @@ if [ "$#" -eq 0 ] || [ "${1:-}" = --channel ] || [ "${1:-}" = --reset-channel ] 
             printf '%s\n' 'Entre em uma sessão root para atualizar o core.' >&2
             exit 1
         fi
-        exec /usr/bin/flock --nonblock /run/melkor/rauc.lock /usr/bin/melkor-core-fetch "$@"
+        status=0
+        /usr/bin/flock --wait 10 --conflict-exit-code 75 /run/melkor/rauc.lock \
+            /usr/bin/melkor-core-fetch "$@" || status=$?
+        if [ "$status" -eq 75 ]; then
+            printf '%s\n' 'O sistema ainda está confirmando o boot ou executando outra atualização.' >&2
+        fi
+        exit "$status"
     fi
 fi
 

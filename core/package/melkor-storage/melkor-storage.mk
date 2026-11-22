@@ -3,7 +3,13 @@ MELKOR_STORAGE_SITE = $(BR2_EXTERNAL_MELKOR_PATH)/../apps
 MELKOR_STORAGE_SITE_METHOD = local
 MELKOR_STORAGE_GOMOD = melkor.local/apps
 MELKOR_STORAGE_BUILD_TARGETS = ./cmd/melkor-storage ./cmd/melkor-core-fetch
-MELKOR_STORAGE_INSTALL_BINS = melkor-storage melkor-core-fetch
+MELKOR_STORAGE_INSTALL_BINS = melkor-storage melkor-core-fetch melkor
 MELKOR_STORAGE_GO_ENV = CGO_ENABLED=0
+
+define MELKOR_STORAGE_BUILD_CLI
+	cd $(@D) && $(HOST_GO_TARGET_ENV) $(MELKOR_STORAGE_GO_ENV) \
+		$(GO_BIN) build $(MELKOR_STORAGE_BUILD_OPTS) -o bin/melkor .
+endef
+MELKOR_STORAGE_POST_BUILD_HOOKS += MELKOR_STORAGE_BUILD_CLI
 
 $(eval $(golang-package))

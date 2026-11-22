@@ -84,7 +84,7 @@ channel-pc:
 	$(BUILD_ENV) python3 scripts/channel-pc.py "$(OUT)/build" "$(OUT)/melkor-pc-$(VERSION).raucb" \
 		--keyring "$(KEYRING)" --key "$(CHANNEL_KEY)" --url "$(BUNDLE_URL)" \
 		--days "$(or $(CHANNEL_DAYS),90)" $(if $(filter 1,$(CHANNEL_DESKTOP)),--desktop) \
-		--output "$(OUT)/$(if $(filter 1,$(CHANNEL_DESKTOP)),melkor-pc-desktop.json,melkor-pc-channel.json)"
+		--output "$(OUT)/$(if $(filter 1,$(CHANNEL_DESKTOP)),melkor-pc-limine-desktop.json,melkor-pc-limine-channel.json)"
 
 test-update: BOARD = m1
 test-update:
@@ -119,7 +119,7 @@ pc-disk:
 	$(BUILD_ENV) env PATH="$(abspath $(OUT))/build/host/bin:/usr/bin:/usr/sbin" "$(OUT)/melkor-disco" \
 		-saida "$(OUT)/melkor-pc.img" -gib "$(PC_DISK_GIB)" -core "$(OUT)/build/images/rootfs.squashfs" \
 		-sha256 "$$(awk '$$2 == "rootfs.squashfs" {print $$1}' "$(OUT)/SHA256SUMS")" \
-		-efi "$(OUT)/build/images/efi-part/EFI/BOOT/bootx64.efi" -grub core/board/pc/grub.cfg \
+		-efi "$(OUT)/build/images/efi-part/EFI/BOOT/bootx64.efi" \
 		$(if $(PC_CREDENTIALS),-credenciais "$(PC_CREDENTIALS)")
 
 test-pc-disk: BOARD = pc

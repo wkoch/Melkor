@@ -51,7 +51,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
             bc binutils bison build-essential ca-certificates cpio diffutils file flex \
-            gawk git gzip libncurses-dev m4 make patch perl python3 rsync tar unzip \
+            gawk git gzip libatomic1 libncurses-dev m4 make patch perl python3 rsync tar unzip \
             wget xz-utils qemu-system-x86 ovmf e2fsprogs util-linux
       - name: Construir a imagem
         run: make image BOARD=${{ matrix.board }}

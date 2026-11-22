@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+case "$#:${1:-}:${2:-}" in
+    2:pacote:noctalia)
+        if [ "$(/usr/bin/id -u)" = 0 ]; then
+            exec /usr/sbin/melkor-core-update --desktop
+        fi
+        exec /bin/su -c '/usr/sbin/melkor-core-update --desktop' - root
+        ;;
+    1:core:)
+        printf '%s\n' 'Use instalar core no console da ISO de instalação.' >&2
+        exit 2
+        ;;
+    1:pacote:|1::) ;;
+    1:*:)
+        if [ "$(/usr/bin/id -u)" = 0 ]; then
+            printf '%s\n' 'Instale aplicativos na conta de usuário.' >&2
+            exit 1
+        fi
+        exec /usr/bin/melkor instalar "$1"
+        ;;
+esac
+
+printf '%s\n' 'Uso: instalar pacote noctalia | instalar <aplicativo>' >&2
+exit 2
