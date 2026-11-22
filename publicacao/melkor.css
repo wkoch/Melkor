@@ -1,3 +1,12 @@
+/* Barlow Condensed 700, Google Fonts v13. Licença em barlow-OFL.txt. */
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("barlow-condensed-700.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   font-family: system-ui, sans-serif;
@@ -7,7 +16,6 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; }
-[hidden] { display: none !important; }
 
 .hero {
   --paper: #fff1dc;
@@ -32,10 +40,10 @@ body { margin: 0; }
 
 h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   font-size: clamp(4rem, 7.35vw, 7.75rem);
-  font-weight: normal;
-  letter-spacing: -0.068em;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   line-height: 0.94;
   text-wrap: balance;
 }
@@ -106,7 +114,7 @@ button:focus-visible {
   position: absolute;
   top: 50%;
   right: 0;
-  width: max(100%, calc(100svh * 1672 / 941));
+  width: clamp(calc(100svh * 1672 / 941), 100%, 218svh);
   aspect-ratio: 1672 / 941;
   translate: 0 -50%;
 }
@@ -127,46 +135,39 @@ button:focus-visible {
   background: linear-gradient(90deg, #151019 0%, #151019f5 17%, #151019d6 32%, #15101927 54%, transparent 68%);
 }
 
-.pluck {
+.star {
   position: absolute;
   z-index: 1;
-  top: 55.7%;
-  left: 60.4%;
+  top: var(--y);
+  left: var(--x);
   translate: -50% -50%;
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0;
-  border: 1px solid #ffe4bdcc;
+  border: 0;
   border-radius: 50%;
-  background: #28161875;
-  color: #fff1dc;
-  cursor: pointer;
+  background: transparent;
+  /* A cena resolve qual estrela está mais perto do ponteiro. */
+  pointer-events: none;
 }
 
-.pluck-mark {
-  width: 0.43rem;
-  height: 0.43rem;
-  border-radius: 50%;
-  background: #fff1dc;
-  box-shadow: 0 0 0.85rem #ffc689;
-}
-
-.pluck-label {
+.star::before {
+  content: "";
   position: absolute;
-  inset-block-start: calc(100% + 0.45rem);
-  width: max-content;
-  padding: 0.36rem 0.63rem;
-  border-radius: 0.2rem;
-  background: #251720;
-  color: #fff1dc;
-  font-size: 0.8rem;
-  font-weight: 650;
+  inset: -30%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8d5 0%, #ffd19ac9 8%, #ffad6454 23%, transparent 66%);
+  opacity: 0.55;
 }
 
-.pluck:hover { background: #6e3a22c9; }
-.resonance { pointer-events: none; }
+.star.is-active::before {
+  opacity: 1;
+  animation: none;
+  transform: scale(1.25);
+}
+
+.scene.is-over-star { cursor: pointer; }
+.resonance { pointer-events: none; z-index: 1; }
 
 .status {
   position: absolute;
@@ -197,7 +198,7 @@ button:focus-visible {
     position: relative;
     inset: auto;
     width: 100%;
-    height: clamp(295px, 65vw, 420px);
+    height: max(clamp(295px, 65vw, 420px), 51vw);
   }
 
   .plate { width: max(100%, clamp(535px, 108vw, 830px)); }
@@ -210,12 +211,19 @@ button:focus-visible {
 @media (prefers-reduced-motion: no-preference) {
   [data-enter] { animation: entrar 480ms ease-out both; }
 
-  .download, .pluck {
+  .download {
     transition: background-color 150ms ease, transform 150ms ease;
   }
 
-  .download:hover, .pluck:hover { transform: translateY(-2px); }
-  .download:active, .pluck:active { transform: translateY(1px); }
+  .download:hover { transform: translateY(-2px); }
+  .download:active { transform: translateY(1px); }
+
+  .star::before { animation: pulsar 3.2s var(--delay) ease-in-out infinite; }
+
+  @keyframes pulsar {
+    0%, 100% { opacity: 0.3; transform: scale(0.9); }
+    50% { opacity: 0.95; transform: scale(1.16); }
+  }
 
   @keyframes entrar {
     from { opacity: 0; transform: translateY(0.5rem); }
