@@ -29,7 +29,13 @@ Ao concluir, reinicie sem a mídia e entre como `melkor`. A base abre no console
 
 ### Instalar o desktop depois
 
-Com o canal do desktop publicado, conecte-se ao Wi-Fi com `iwctl`, entre com `su -` e rode `melkor-finalizar`. O comando baixa o manifesto assinado e o bundle por HTTPS. A primeira ISO com seleção numérica inclui a versão de pendrive do comando. O download automático exige uma imagem que inclua o novo atualizador.
+Com a ISO mínima da versão `pc-v0.1.0-alpha.5-desktop`, conecte-se ao Wi-Fi com `iwctl`. Entre como root com `su -`, execute `melkor-finalizar` e reinicie. O comando baixa o manifesto e o bundle por HTTPS, verifica as assinaturas e instala o desktop no slot inativo. [ISO mínima e bundle desktop](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.5-desktop)
+
+Se você instalou a ISO pública `pc-v0.1.0-alpha.4-core`, aplique o bundle diretamente na sessão root e reinicie.
+
+```sh
+melkor-core-update --https https://github.com/wkoch/Melkor/releases/download/pc-v0.1.0-alpha.5-desktop/melkor-pc-0.1.0-alpha.5-desktop.raucb e55d38298c28df7d446961e90602e65a562511df3a60e47f26e89b8bd2235957
+```
 
 Para instalar pelo pendrive, copie o arquivo local assinado `melkor-desktop.raucb` para uma partição FAT32. Na sessão root, rode `melkor-finalizar MELKOR_APPS` se esse for o rótulo da partição. Para usar uma partição FAT32 do Ventoy rotulada `Ventoy`, rode `melkor-finalizar Ventoy`.
 
