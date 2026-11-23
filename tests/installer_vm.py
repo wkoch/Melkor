@@ -75,14 +75,6 @@ def machine(qemu, accel, code, variables, disk, neighbor, log_path, sector,
                 log.write(vm.stdout.read())
 
 
-def select_serial(console):
-    highlighted = console.expect(rb"\*Instalar Melkor(?: \(serial\))?", "menu UEFI")
-    if not highlighted.endswith(b"(serial)"):
-        console.send(b"\x1b[B", end=b"")
-        console.expect(rb"\*Instalar Melkor \(serial\)", "entrada serial do instalador")
-    console.send(b"")
-
-
 def check_ventoy_iso(iso, drive):
     table = json.loads(subprocess.check_output(["sfdisk", "--json", drive]))["partitiontable"]
     offset = table["partitions"][0]["start"] * table["sectorsize"]
@@ -95,9 +87,11 @@ def check_ventoy_iso(iso, drive):
 def install(vm, log, deadline, disk, passwords, sector):
     fingerprints = BOOT["file_digest"]
     with BOOT["serial_console"](vm, log, deadline) as console:
-        select_serial(console)
+        BOOT["limine_entry"](console, b"\x1b[B")
         before = fingerprints(disk)
         for confirmation in (b"cancelar", b"APAGAR"):
+            console.expect(b"Digite instalar core para iniciar: ", "comando inicial do instalador")
+            console.send(b"instalar core")
             initial = console.expect("Número do disco: ".encode(), "lista de discos internos")
             intended = re.search(rb'^([1-9][0-9]*)[.] "QEMU NVMe Ctrl", 16[.]0 GiB, setor de '
                                  + str(sector).encode() + rb" bytes", initial, re.M)
@@ -135,6 +129,27 @@ def stage_desktop(vm, log, passwords):
         guest(console, "for attempt in $(seq 1 15); do blkid -t LABEL=MELKOR_APPS -o device && exit 0; sleep 1; done; "
               "blkid; dmesg | tail -30; exit 1")
         guest(console, "melkor-finalizar MELKOR_APPS && sync")
+
+
+def check_operational_commands(vm, log, passwords):
+    offline = rb"(?i)dial (?:tcp|udp)|lookup |network is unreachable|no route to host|" + \
+        "ainda não contém a chave".encode()
+    with BOOT["serial_console"](vm, log, 200) as console:
+        BOOT["login"](console, b"melkor", passwords[0], rb"^[^\n]*\$ ")
+        guest(console, "instalar core", expected_exit=2)
+        guest(console, "instalar pacote inexistente", expected_exit=2)
+        guest(console, "atualizar argumento", expected_exit=2)
+        console.send(b"instalar pacote noctalia")
+        console.expect(rb"^\r?Password: ?", "elevação para instalar Noctalia")
+        console.send(passwords[1])
+        console.expect(offline, "tentativa de consultar o canal do desktop sem rede")
+        console.expect(rb"^[^\n]*\$ ", "retorno à conta comum")
+        console.send(b"atualizar")
+        console.expect(rb"^\r?Password: ?", "elevação para atualizar o sistema")
+        console.send(passwords[1])
+        console.expect(offline, "tentativa de consultar o canal do sistema sem rede")
+        console.expect(rb"^[^\n]*\$ ", "retorno à conta comum após atualizar")
+        guest(console, 'test -O "$HOME/.local/share/melkor/geracoes" && test "$(id -u)" -ne 0')
 
 
 def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None, graphical=False, desktop_bundle=None):
@@ -179,6 +194,8 @@ def check_installation(iso, run, sector, ventoy=None, mode="normal", memory=None
     for slot in ("A", "B"):
         with machine(qemu, accel, code, variables, disk, neighbor, run / f"serial-{slot.lower()}.log", sector) as session:
             BOOT["check_console"](*session, 240, slot, pc=True, credentials=passwords)
+    with machine(qemu, accel, code, variables, disk, neighbor, run / "serial-comandos.log", sector) as session:
+        check_operational_commands(*session, passwords)
     if desktop_bundle is not None:
         profile_media = run / "profile-media.img"
         capacity_kib = (desktop_bundle.stat().st_size + 1023) // 1024 + 65536

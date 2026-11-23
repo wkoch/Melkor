@@ -6,9 +6,9 @@ O marco M0 entrega uma imagem x86-64 que inicia por UEFI e chega ao console seri
 
 ## Testar a primeira prévia
 
-O fluxo padrão começa com o PC Core por UEFI, com console, Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. O instalador atualizado usa o número do SSD e a confirmação `APAGAR`. Depois de iniciar pelo SSD, `melkor-finalizar` aplica o bundle assinado do desktop. [Instalação em duas etapas](docs/INSTALACAO.md#instalação-da-base-no-disco-inteiro) · [Publicação do canal do desktop](docs/TESTES.md#canal-do-desktop)
+O fluxo padrão começa com o PC Core por UEFI, com console, Wi-Fi, Ethernet, Quad9 DoH e atualização A/B. Na ISO gerada pelo código atual, digite `instalar core`, selecione o SSD pelo número e confirme com `APAGAR`. Depois de iniciar pelo SSD e conectar ao Wi-Fi, `instalar pacote noctalia` aplica o bundle assinado do desktop. [Instalação em duas etapas](docs/INSTALACAO.md#instalação-da-base-no-disco-inteiro) · [Publicação do canal do desktop](docs/TESTES.md#canal-do-desktop)
 
-A ISO mínima atual já inclui o canal do desktop. [Baixar a ISO mínima](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.5-desktop)
+A ISO mínima pública alpha.5 já inclui seu canal do desktop. Ela antecede a troca para Limine. [Baixar a ISO mínima alpha.5](https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.5-desktop)
 
 Baixe a imagem x86-64 pronta para QEMU com UEFI e siga as instruções de boot serial. A prévia inclui dinit, slots A/B, armazenamento persistente e DNS do sistema via Quad9 DoH. A release também oferece o CLI de aplicativos para o host Linux x86-64. A instalação em computador físico faz parte do M4. [Melkor v0.1.0-alpha.1](https://github.com/wkoch/Melkor/releases/tag/v0.1.0-alpha.1)
 
@@ -31,7 +31,11 @@ O fluxo previsto é baixar uma geração assinada do Melkor pela própria instal
 
 Quem modificar a receita poderá gerar a própria imagem em um ambiente de build, com as fontes e ferramentas necessárias. Isso pode ser feito localmente em vez de depender de outra máquina. Os projetos de origem fornecem as versões e correções usadas pelas receitas. A instalação e suas atualizações dispensam enviar alterações a esses projetos.
 
-No PC, entre com `su -` e execute `melkor-core-update`. O endereço de fábrica é `https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-channel.json`. O comando consulta a revisão anunciada, valida o manifesto e instala uma versão mais recente no slot inativo. Reinicie para ativá-la. O canal oficial anuncia a revisão 1 do PC Core. [Publicação do canal](docs/TESTES.md#canal-de-atualizações-do-pc)
+No PC com os comandos novos, rode `atualizar` como `melkor`. A senha de root autoriza a consulta e a aplicação do canal assinado do sistema. A instalação com Noctalia segue o canal do desktop, que entrega core e Noctalia na mesma geração. A instalação mínima segue o canal PC Core. O comando também verifica os aplicativos do perfil de usuário com as receitas do catálogo ativo. Reinicie quando houver uma nova geração do sistema.
+
+A ISO pública alpha.5 ainda usa a tela de discos direta, `su -` seguido de `melkor-finalizar` para instalar o desktop e `melkor-core-update` para atualizar. Em uma instalação já com Noctalia dessa versão, use `melkor-core-update --desktop`. [Publicação do canal](docs/TESTES.md#canal-de-atualizações-do-pc)
+
+As imagens geradas com Limine usam canais assinados próprios. Uma instalação anterior baseada em GRUB precisa de migração de boot ou reinstalação antes de usar o canal novo.
 
 Para usar outro endereço HTTPS que publique manifestos assinados pela chave do canal, execute `melkor-core-update --channel URL`. A escolha persiste entre atualizações. Use `melkor-core-update --reset-channel` para restaurar o endereço de fábrica. Para instalar um bundle específico, o PC aceita `melkor-core-update --https URL SHA256` e o PC e o M1 aceitam `melkor-core-update /caminho/bundle.raucb`. `melkor atualizar` atende aos aplicativos do catálogo. [Marcos](docs/MARCOS.md)
 
@@ -81,7 +85,7 @@ O host Bazzite é imutável e não tem `sudo` sem senha. As ferramentas de build
 | `make test-update OUT=out/m1-rauc CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Imagem M1 com certificado e credencial descartáveis, Python 3.11+, QEMU, OVMF, `mke2fs` e `sfdisk` | Testa instalação, rejeições, confirmação e recuperação do core em cópias do disco. [Procedimento de laboratório](docs/TESTES.md#bundles-assinados-e-recuperação-m1) |
 | `make bundle-pc CERT=… KEY=… KEYRING=… VERSION=…` e `make test-update BOARD=pc CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Build e disco virtual PC com as credenciais do laboratório | Usa a compatibilidade RAUC própria do PC e testa a atualização em discos descartáveis. |
 | `make test-update-https CERT=… KEY=… ROOT_PASSWORD_FILE=…` | Build e disco virtual PC, Python 3.11+, QEMU, OVMF, OpenSSL e `mke2fs` | Serve bundles por TLS local e verifica rejeições, promoção e persistência em uma cópia do disco. [Procedimento](docs/TESTES.md#download-https-de-atualizações-do-pc) |
-| `make channel-pc VERSION=… KEYRING=… CHANNEL_KEY=… BUNDLE_URL=…` | Bundle PC já criado, chave Ed25519 privada do canal, chaveiro RAUC e ferramentas do build | Verifica o bundle e gera `OUT/melkor-pc-channel.json` com a revisão extraída do SquashFS. |
+| `make channel-pc VERSION=… KEYRING=… CHANNEL_KEY=… BUNDLE_URL=…` | Bundle PC já criado, chave Ed25519 privada do canal, chaveiro RAUC e ferramentas do build | Verifica o bundle e gera `OUT/melkor-pc-limine-channel.json` com a revisão extraída do SquashFS. |
 | `make test-channel-pc CERT=… KEY=… ROOT_PASSWORD_FILE=… CHANNEL_KEY=… CHANNEL_CANDIDATE=…` | Dois builds PC com revisões crescentes e chaves descartáveis | Exercita a atualização sem argumentos e a troca persistente de canal. [Procedimento](docs/TESTES.md#canal-de-atualizações-do-pc) |
 | `make test` | Go 1.24+, compilador C, Python 3.11+, coverage.py e kcov | Executa a suíte local e reprova cobertura abaixo de 80%. [Preparação e critérios](docs/TESTES.md#cobertura-do-código-próprio) |
 

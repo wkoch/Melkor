@@ -17,3 +17,4 @@ install -d -m 0700 /run/melkor /run/melkor/esp /run/rauc /persist/rauc
 ln -sf "$core_a" /run/melkor/core-a
 ln -sf "$core_b" /run/melkor/core-b
 mount -t vfat -o rw,nosuid,nodev,noexec,fmask=0177,dmask=0077 "$esp" /run/melkor/esp
+mount -t efivarfs -o nosuid,nodev,noexec efivarfs /sys/firmware/efi/efivars

@@ -55,6 +55,7 @@ class DesktopLayerTest(unittest.TestCase):
                 self.assertEqual((stage / "packages/pacote.apk").read_bytes(), payload)
                 greeter_patch = stage / "packages/noctalia-greeter-protocol-headers.patch"
                 if "build-noctalia-greeter" in args[-1]:
+                    self.assertIn("export CC_LD=mold CXX_LD=mold", args[-1])
                     self.assertEqual(greeter_patch.read_bytes(), LAYER["GREETER_PATCH"].read_bytes())
                 else:
                     self.assertFalse(greeter_patch.exists())

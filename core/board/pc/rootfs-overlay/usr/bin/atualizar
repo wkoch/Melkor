@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -ne 0 ]; then
+    printf '%s\n' 'Uso: atualizar' >&2
+    exit 2
+fi
+
+if [ "$(/usr/bin/id -u)" = 0 ]; then
+    printf '%s\n' 'Execute atualizar na conta de usuário. O comando pede a senha de root para atualizar o sistema.' >&2
+    exit 1
+fi
+
+if [ -f /etc/dinit.d/graphical-login ]; then
+    system_update='/usr/sbin/melkor-core-update --desktop'
+else
+    system_update='/usr/sbin/melkor-core-update'
+fi
+
+status=0
+/bin/su -c "$system_update" - root || status=$?
+/usr/bin/melkor atualizar || exit $?
+exit "$status"

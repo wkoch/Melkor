@@ -21,7 +21,7 @@ import (
 
 const (
 	channelLimit = 16 << 10
-	pcTarget     = "melkor-pc-x86_64"
+	pcTarget     = "melkor-pc-limine-x86_64"
 )
 
 type release struct {

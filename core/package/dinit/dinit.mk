@@ -9,9 +9,11 @@ DINIT_SOURCE = dinit-$(DINIT_VERSION).tar.xz
 DINIT_SITE = https://github.com/davmac314/dinit/releases/download/v$(DINIT_VERSION)
 DINIT_LICENSE = Apache-2.0
 DINIT_LICENSE_FILES = LICENSE
+DINIT_DEPENDENCIES = host-melkor-mold
 
 define DINIT_CONFIGURE_CMDS
 	cd $(@D) && $(TARGET_MAKE_ENV) $(TARGET_CONFIGURE_OPTS) \
+		CXXFLAGS="$(TARGET_CXXFLAGS) -flto=auto" LDFLAGS="$(TARGET_LDFLAGS) $(MELKOR_MOLD_LDFLAGS) -flto=auto" \
 		CXX_FOR_BUILD="$(HOSTCXX)" ./configure --platform=Linux \
 		--prefix=/usr --sbindir=/sbin --disable-strip --disable-capabilities \
 		--disable-cgroups --disable-utmpx

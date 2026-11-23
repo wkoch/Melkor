@@ -17,8 +17,11 @@ func imageFixture(t *testing.T) ImageInput {
 	if err := os.Mkdir(bin, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"sfdisk", "mke2fs", "grub-editenv", "mkfs.vfat", "mcopy", "fakeroot"} {
+	for _, name := range []string{"sfdisk", "mke2fs", "unsquashfs", "mkfs.vfat", "mcopy", "fakeroot"} {
 		text := "#!/bin/sh\n[ \"${TEST_DISK_FAIL:-}\" != \"${0##*/}\" ]\n"
+		if name == "unsquashfs" {
+			text += "status=$?; [ $status -eq 0 ] || exit $status; head -c 514 /dev/zero; printf HdrS; exit 0\n"
+		}
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(text), 0o700); err != nil {
 			t.Fatal(err)
 		}
@@ -28,9 +31,9 @@ func imageFixture(t *testing.T) ImageInput {
 	input := ImageInput{
 		Destination: filepath.Join(work, "disk.img"), SizeBytes: MinimumDisk,
 		Core: filepath.Join(work, "core.squashfs"), CoreSHA256: fmt.Sprintf("%x", sha256.Sum256(core)),
-		EFI: filepath.Join(work, "bootx64.efi"), GRUB: filepath.Join(work, "grub.cfg"),
+		EFI: filepath.Join(work, "bootx64.efi"),
 	}
-	for file, data := range map[string][]byte{input.Core: core, input.EFI: []byte("EFI"), input.GRUB: []byte("@CORE_A@ @CORE_B@\n")} {
+	for file, data := range map[string][]byte{input.Core: core, input.EFI: []byte("EFI")} {
 		if err := os.WriteFile(file, data, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -88,7 +91,7 @@ func TestGravaCoreNosDoisSlotsEPublicaDisco(t *testing.T) {
 
 func TestFalhaMantemDestinoEApagaTemporarios(t *testing.T) {
 	for _, test := range []struct{ edit, expected string }{
-		{"hash", "SHA-256"}, {"conteudo", "difere"}, {"grub", "exatamente uma"},
+		{"hash", "SHA-256"}, {"conteudo", "difere"}, {"unsquashfs", "extrair kernel"},
 		{"mkfs.vfat", "mkfs.vfat"}, {"sfdisk", "sfdisk"}, {"mke2fs", "mke2fs"},
 		{"destino", "file exists"},
 	} {
@@ -99,10 +102,6 @@ func TestFalhaMantemDestinoEApagaTemporarios(t *testing.T) {
 				input.CoreSHA256 = "invalido"
 			case "conteudo":
 				input.CoreSHA256 = strings.Repeat("0", 64)
-			case "grub":
-				if err := os.WriteFile(input.GRUB, []byte("@CORE_A@"), 0o600); err != nil {
-					t.Fatal(err)
-				}
 			case "destino":
 				if err := os.WriteFile(input.Destination, []byte("preservar"), 0o600); err != nil {
 					t.Fatal(err)

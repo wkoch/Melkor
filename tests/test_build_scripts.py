@@ -29,8 +29,7 @@ class BuildScriptsTest(unittest.TestCase):
         cls.stub.chmod(0o755)
         cls.bin = cls.work / "bin"
         cls.bin.mkdir()
-        for name in ("git", "make", "rpm", "sudo", "distrobox", "mke2fs", "genimage", "grub-script-check",
-                     "grub-editenv", "openssl", "xorriso"):
+        for name in ("git", "make", "rpm", "sudo", "distrobox", "mke2fs", "genimage", "openssl", "xorriso"):
             (cls.bin / name).symlink_to(cls.stub)
         cls.marker = cls.work / "container"
         cls.marker.touch()
@@ -40,6 +39,10 @@ test() {
     if [[ $* = "-x /usr/bin/melkor-core-fetch" ]]; then [[ ${TEST_CORE_FETCH:-} = yes ]]; else builtin test "$@"; fi
 }
 exec() { printf '%s\n' "$*" >> "$TEST_BOOT_LOG"; exit 0; }
+function /usr/bin/flock() {
+    printf '/usr/bin/flock %s\n' "$*" >> "$TEST_BOOT_LOG"
+    return "${TEST_FLOCK_STATUS:-0}"
+}
 script=$1
 shift
 source "$script" "$@"
@@ -267,6 +270,10 @@ source "$script" "$@"
         env = dict(BUILD_DIR=str(build), BINARIES_DIR=str(binaries), HOST_DIR=str(host))
         board = self.project / "core/board"
         self.run_script(board / "m0/post-image.sh", code=1, **env)
+        limine = host / "share/melkor-limine"
+        limine.mkdir(parents=True)
+        for name in ("BOOTX64.EFI", "LICENSE", "3RDPARTY.md"):
+            (limine / name).write_text(name)
         (efi / "bootx64.efi").write_text("EFI")
         (binaries / "bzImage").write_text("kernel")
         (binaries / "rootfs.squashfs").write_text("rootfs")
@@ -277,6 +284,8 @@ source "$script" "$@"
         (binaries / "rootfs.cpio.gz").write_text("initramfs")
         self.run_script(board / "live/post-image.sh", code=5, TEST_GENIMAGE_CODE="5", **env)
         self.run_script(board / "live/post-image.sh", **env)
+        self.run_script(board / "pc/post-image.sh", **env)
+        self.assertEqual((efi / "bootx64.efi").read_text(), "BOOTX64.EFI")
         target = build / "target"
         self.run_script(board / "m1/post-build.sh", target, **env)
         self.assertEqual((target / "boot/bzImage").read_text(), "kernel")
@@ -443,6 +452,57 @@ source "$script" "$@"
         self.run_script(wrapper, login / "usr/libexec/melkor-start-noctalia")
         self.assertEqual(self.boot_log.read_text().splitlines(),
                          ["WAYLAND_DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "noctalia"])
+
+    def test_comandos_do_pc_separam_elevacao_do_perfil_de_usuario(self):
+        wrapper = self.wrapper("comandos-pc", r"""
+exec() { "$@"; exit $?; }
+function /usr/bin/id() { printf '%s\n' "$TEST_UID"; }
+function /usr/sbin/melkor-core-update() { printf 'core %s\n' "$*" >> "$TEST_BOOT_LOG"; }
+function /bin/su() {
+    printf 'su %s\n' "$*" >> "$TEST_BOOT_LOG"
+    return "${TEST_SYSTEM_STATUS:-0}"
+}
+function /usr/bin/melkor() {
+    printf 'melkor %s\n' "$*" >> "$TEST_BOOT_LOG"
+    return "${TEST_APP_STATUS:-0}"
+}
+function [() {
+    if [[ "$*" == '-f /etc/dinit.d/graphical-login ]' ]]; then
+        [[ "${TEST_DESKTOP:-0}" == 1 ]]
+    else
+        builtin [ "$@"
+    fi
+}
+script=$1
+shift
+source "$script" "$@"
+""")
+        commands = self.project / "core/board/pc/rootfs-overlay/usr/bin"
+        install = commands / "instalar"
+        update = commands / "atualizar"
+        for args in ((), ("core",), ("pacote",), ("pacote", "outro"), ("blanc", "extra")):
+            self.run_script(wrapper, install, *args, code=2, TEST_UID="1000")
+        self.run_script(wrapper, install, "blanc", code=1, TEST_UID="0")
+        self.run_script(wrapper, update, code=1, TEST_UID="0")
+        self.run_script(wrapper, update, "extra", code=2, TEST_UID="1000")
+        self.assertEqual(self.boot_log.read_text(), "")
+        self.run_script(wrapper, install, "blanc", TEST_UID="1000")
+        self.run_script(wrapper, install, "pacote", "noctalia", TEST_UID="1000")
+        self.run_script(wrapper, install, "pacote", "noctalia", TEST_UID="0")
+        self.run_script(wrapper, update, TEST_UID="1000")
+        self.run_script(wrapper, update, code=3, TEST_UID="1000", TEST_DESKTOP="1", TEST_SYSTEM_STATUS="3")
+        self.run_script(wrapper, update, code=4, TEST_UID="1000", TEST_APP_STATUS="4")
+        self.assertEqual(self.boot_log.read_text().splitlines(), [
+            "melkor instalar blanc",
+            "su -c /usr/sbin/melkor-core-update --desktop - root",
+            "core --desktop",
+            "su -c /usr/sbin/melkor-core-update - root",
+            "melkor atualizar",
+            "su -c /usr/sbin/melkor-core-update --desktop - root",
+            "melkor atualizar",
+            "su -c /usr/sbin/melkor-core-update - root",
+            "melkor atualizar",
+        ])
 
     def test_finaliza_pc_com_midia_somente_leitura_e_limpa_area_temporaria(self):
         wrapper = self.wrapper("finalizar", '''
@@ -618,7 +678,8 @@ source "$script" "$@"
         lines = self.boot_log.read_text().splitlines()
         self.assertIn("ln -sf /dev/vda2 /run/melkor/core-a", lines)
         self.assertIn("ln -sf /dev/vda3 /run/melkor/core-b", lines)
-        self.assertTrue(lines[-1].endswith("/dev/vda1 /run/melkor/esp"))
+        self.assertTrue(any(line.endswith("/dev/vda1 /run/melkor/esp") for line in lines))
+        self.assertIn("efivarfs /sys/firmware/efi/efivars", lines[-1])
         self.boot_log.write_text("")
         self.run_script(self.boot, setup, code=1, TEST_AMBIGUOUS="1")
         self.assertEqual(self.boot_log.read_text(), "")
@@ -652,10 +713,13 @@ source "$script" "$@"
         for args in ((), ("--channel", source), ("--reset-channel",), ("--desktop",)):
             self.run_script(self.update, update, *args, code=1, TEST_UID="1000", TEST_CORE_FETCH="yes")
             self.run_script(self.update, update, *args, TEST_UID="0", TEST_CORE_FETCH="yes")
-        prefix = "/usr/bin/flock --nonblock /run/melkor/rauc.lock /usr/bin/melkor-core-fetch"
+        prefix = "/usr/bin/flock --wait 10 --conflict-exit-code 75 /run/melkor/rauc.lock /usr/bin/melkor-core-fetch"
         self.assertEqual(self.boot_log.read_text().splitlines(),
                          [prefix, f"{prefix} --channel {source}", f"{prefix} --reset-channel",
                           f"{prefix} --desktop"])
+        output = self.run_script(self.update, update, code=75, TEST_UID="0", TEST_CORE_FETCH="yes",
+                                 TEST_FLOCK_STATUS="75")
+        self.assertIn("confirmando o boot ou executando outra atualização", output)
 
     def test_boot_monta_alvos_e_interrompe_em_falha(self):
         board = self.project / "core/board"

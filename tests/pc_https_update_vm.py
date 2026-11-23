@@ -18,7 +18,7 @@ from threading import Thread
 from types import SimpleNamespace
 
 from m1_update_vm import (
-    BOOT, BUNDLE, DOCUMENT, confirm, create_bundle, fixture_images, grub_state, guest, machine, slot, slot_hash,
+    BOOT, BUNDLE, DOCUMENT, confirm, create_bundle, fixture_images, boot_state, guest, machine, slot, slot_hash,
 )
 
 
@@ -113,21 +113,21 @@ def exercise(args, work):
             guest(console, "mkdir -p /run/seed && mount -t ext4 -o ro /dev/vdb /run/seed")
             guest(console, "for attempt in $(seq 1 20); do "
                   "ip -4 route show default | grep -q . && exit 0; sleep 1; done; exit 1")
-            original = grub_state(console)
-            a_hash, b_hash = slot_hash(console, "a"), slot_hash(console, "b")
+            original = boot_state(console)
+            a_hash, b_hash = slot_hash(disk, "a"), slot_hash(disk, "b")
             guest(console, f"{ca} flock /run/melkor/rauc.lock {update} {bundle} {digest}", allowed=(1,))
             for command, expected in ((f"{update} {bundle} {digest}", b"x509:"),
                                       (f"{trusted} {bundle} {'0' * 64}", b"SHA-256"),
                                       (f"{trusted} {invalid} {invalid_digest}", b"signature verification failed")):
                 result = guest(console, command, allowed=(1,))
                 assert expected.lower() in result.lower(), f"erro esperado ausente: {expected}"
-                assert grub_state(console) == original, "rejeição alterou o estado de boot"
-                assert slot_hash(console, "b") == b_hash, "rejeição gravou no slot inativo"
+                assert boot_state(console) == original, "rejeição alterou o estado de boot"
+                assert slot_hash(disk, "b") == b_hash, "rejeição gravou no slot inativo"
                 guest(console, clean)
             guest(console, f"{trusted} {bundle} {digest}")
             guest(console, clean)
-            assert grub_state(console)[b"ORDER"] == b"B A"
-            assert slot_hash(console, "a") == a_hash, "atualização alterou o slot ativo"
+            assert boot_state(console)[b"PRIMARY"] == b"B"
+            assert slot_hash(disk, "a") == a_hash, "atualização alterou o slot ativo"
             guest(console, "sync")
 
     with machine(work, "02-first-b", disk, seed, code, variables, timeout, accel) as console:
@@ -148,7 +148,7 @@ def exercise_channel(args, work, disk, variables, code, seed, cert, key, timeout
                   slot_size=BUNDLE["PC_SLOT_SIZE"])
     sign = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/channel-pc.py"))["sign"]
     update = "melkor-core-update"
-    factory = "https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-channel.json"
+    factory = "https://github.com/wkoch/Melkor/releases/download/pc-stable/melkor-pc-limine-channel.json"
     with https_server(http, cert, key) as url:
         document = sign(args.build, bundle, args.cert.resolve(), args.channel_key, f"{url}/update.raucb", 1)
         (http / "channel.json").write_text(document)
@@ -162,14 +162,14 @@ def exercise_channel(args, work, disk, variables, code, seed, cert, key, timeout
             guest(console, "mkdir -p /run/seed && mount -t ext4 -o ro /dev/vdb /run/seed")
             guest(console, "for attempt in $(seq 1 20); do "
                   "ip -4 route show default | grep -q . && exit 0; sleep 1; done; exit 1")
-            state = grub_state(console)
+            state = boot_state(console)
             guest(console, f"{update} --channel {url}/invalid.json")
             result = guest(console, f"SSL_CERT_FILE=/run/seed/tls.pem {update}", allowed=(1,))
             assert b"assinatura do canal" in result
-            assert grub_state(console) == state
+            assert boot_state(console) == state
             guest(console, f"{update} --channel {url}/channel.json")
             guest(console, f"SSL_CERT_FILE=/run/seed/tls.pem {update}")
-            assert grub_state(console)[b"ORDER"] == b"B A"
+            assert boot_state(console)[b"PRIMARY"] == b"B"
             guest(console, "sync")
 
         with machine(work, "02-channel-b", disk, seed, code, variables, timeout, accel, network=True) as console:
@@ -181,10 +181,10 @@ def exercise_channel(args, work, disk, variables, code, seed, cert, key, timeout
             guest(console, "mkdir -p /run/seed && mount -t ext4 -o ro /dev/vdb /run/seed")
             guest(console, "for attempt in $(seq 1 20); do "
                   "ip -4 route show default | grep -q . && exit 0; sleep 1; done; exit 1")
-            state = grub_state(console)
+            state = boot_state(console)
             result = guest(console, f"SSL_CERT_FILE=/run/seed/tls.pem {update}")
             assert b"atualizado." in result
-            assert grub_state(console) == state
+            assert boot_state(console) == state
             guest(console, f"{update} --reset-channel && test ! -e /persist/rauc/channel")
             guest(console, f"grep -Fx {shlex.quote(factory)} /etc/melkor-update/channel")
 

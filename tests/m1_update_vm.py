@@ -3,6 +3,7 @@
 
 import argparse
 from contextlib import contextmanager
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -20,7 +21,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 BOOT = runpy.run_path(str(SCRIPTS / "test-boot.py"))
 BUNDLE = runpy.run_path(str(SCRIPTS / "bundle-m1.py"))
 create_bundle = BUNDLE["create_bundle"]
-GRUBENV = "/run/melkor/esp/EFI/BOOT/grubenv"
+BOOT_BACKEND = "/usr/bin/melkor-boot"
 DOCUMENT = "/home/melkor/persistencia-atualizacao"
 INPUT = "/persist/rauc/test-bundle.raucb"
 UPDATE = f"/usr/sbin/melkor-core-update {INPUT}"
@@ -44,7 +45,7 @@ def fixture_images(build, work, outcomes=("healthy", "unhealthy")):
             assert len(filtered) == len(lines) - 1, "Serviço de confirmação ausente."
             metadata = work / "unhealthy.pseudo"
             metadata.write_bytes(b"".join(filtered) + separator + payload)
-        command = [host / "mksquashfs", empty, work / f"{name}.squashfs", "-noappend", "-processors", "2",
+        command = [host / "mksquashfs", empty, work / f"{name}.squashfs", "-noappend", "-no-xattrs", "-processors", "2",
                    "-no-progress", "-comp", "gzip", "-pf", metadata, "-p",
                    f"etc/melkor-test-generation f 0644 0 0 echo {name}"]
         if name == "unhealthy":
@@ -65,7 +66,7 @@ def seed_disk(args, work):
         create_bundle(rauc, work / f"{name}.squashfs", args.cert, args.key, args.cert, version,
                       seed / f"{name}.raucb", compatible=compatible, slot_size=capacity)
     create_bundle(rauc, work / "healthy.squashfs", args.cert, args.key, args.cert, "2.0-test", seed / "incompatible.raucb",
-                  compatible=BUNDLE["COMPATIBLE"] if args.pc_image else "other-m1", slot_size=capacity)
+                  compatible="melkor-pc-x86_64" if args.pc_image else "melkor-m1-x86_64", slot_size=capacity)
 
     data = bytearray((seed / "healthy.raucb").read_bytes())
     signed = len(data) - int.from_bytes(data[-8:], "big") - 8
@@ -134,19 +135,39 @@ def slot(console, name):
     guest(console, f"grep -qw rauc.slot={name} /proc/cmdline && test \"$(cat /proc/1/comm)\" = dinit")
 
 
-def grub_state(console):
-    output = guest(console, f"grub-editenv {GRUBENV} list")
-    return dict(re.findall(rb"^(ORDER|[AB]_(?:OK|TRY))=([^\n]*)$", output, re.MULTILINE))
+def boot_state(console):
+    output = guest(console, f'primary=$({BOOT_BACKEND} get-primary) && '
+                   f'a=$({BOOT_BACKEND} get-state A) && b=$({BOOT_BACKEND} get-state B) && '
+                   'printf "PRIMARY=%s\\nA=%s\\nB=%s\\n" "$primary" "$a" "$b"')
+    return dict(re.findall(rb"^(PRIMARY|A|B)=([^\n]*)$", output, re.MULTILINE))
 
 
 def confirm(console, name):
     guest(console, "for attempt in 1 2 3 4 5; do "
-          f"if grub-editenv {GRUBENV} list | grep -qx {name}_TRY=0; then exit 0; fi; "
+          f'if test "$({BOOT_BACKEND} get-primary)" = {name}; then exit 0; fi; '
           "sleep 1; done; dinitctl status rauc-confirm; exit 1")
 
 
-def slot_hash(console, name):
-    return re.search(rb"^([a-f0-9]{64}) ", guest(console, f"sha256sum /run/melkor/core-{name}"), re.MULTILINE)[1]
+def slot_region(disk, name):
+    table = json.loads(subprocess.check_output(["sfdisk", "--json", disk]))["partitiontable"]
+    partition = next(item for item in table["partitions"] if item["name"] == f"core-{name}")
+    sector = table["sectorsize"]
+    return partition["start"] * sector, partition["size"] * sector
+
+
+def slot_hash(disk, name):
+    offset, remaining = slot_region(disk, name)
+    digest = hashlib.sha256()
+    # O QEMU usa cache=none. Leia o disco virtual diretamente para evitar o
+    # custo da emulação de 2 GiB de SHA-256 no PC.
+    with disk.open("rb", buffering=0) as image:
+        image.seek(offset)
+        while remaining:
+            chunk = image.read(min(remaining, 1024 * 1024))
+            assert chunk, "Disco virtual truncado."
+            digest.update(chunk)
+            remaining -= len(chunk)
+    return digest.digest()
 
 
 def install(console, name, allowed=(0,)):
@@ -159,9 +180,7 @@ def copy_bundle(console, name):
 
 
 def wait_for_partial_write(disk, candidate):
-    table = json.loads(subprocess.check_output(["sfdisk", "--json", disk]))["partitiontable"]
-    inactive = next(partition for partition in table["partitions"] if partition["name"] == "core-b")
-    offset = inactive["start"] * table["sectorsize"]
+    offset, _ = slot_region(disk, "b")
     with candidate.open("rb") as image, disk.open("rb", buffering=0) as virtual:
         header = image.read(4096)
         tail_offset = candidate.stat().st_size - 4096
@@ -189,11 +208,7 @@ def scenario(args, work, seed, code, firmware_vars, password, outcome, timeout, 
     def root(stage, write_limit=False, select_a=False):
         with machine(work, stage, disk, seed, code, variables, timeout, accel, write_limit) as console:
             if select_a:
-                console.expect(rb"The highlighted entry will be executed automatically in", "menu do GRUB")
-                console.send(b"\x1b[A", end=b"")
-                target = b"PC" if args.pc_image else b"M1"
-                console.expect(rb"\*Melkor Linux " + target + rb" - slot A", "seleção manual de A")
-                console.send(b"")
+                BOOT["limine_entry"](console, b"\x1b[A")
             BOOT["login"](console, b"root", password, rb"^[^\n]*# ")
             yield console
             if not write_limit:
@@ -204,8 +219,8 @@ def scenario(args, work, seed, code, firmware_vars, password, outcome, timeout, 
         confirm(console, "A")
         guest(console, f"printf 'persistiu\\n' > {DOCUMENT} && chown melkor {DOCUMENT}")
         guest(console, "mkdir -p /run/seed && mount -t ext4 -o ro /dev/vdb /run/seed")
-        initial_state = grub_state(console)
-        a_hash, b_hash = slot_hash(console, "a"), slot_hash(console, "b")
+        initial_state = boot_state(console)
+        a_hash, b_hash = slot_hash(disk, "a"), slot_hash(disk, "b")
         if outcome == "interrupted":
             copy_bundle(console, "healthy")
             guest(console, "sync")
@@ -218,27 +233,27 @@ def scenario(args, work, seed, code, firmware_vars, password, outcome, timeout, 
                 assert b"Entre em uma sess" in rejected, "A recusa não confirmou a falta de privilégio"
                 copy_bundle(console, "healthy")
                 guest(console, f"flock /run/melkor/rauc.lock {UPDATE}", allowed=(1,))
-                assert grub_state(console) == initial_state
-                assert slot_hash(console, "b") == b_hash
+                assert boot_state(console) == initial_state
+                assert slot_hash(disk, "b") == b_hash
                 for name, error in (("bad-signature", b"signature verification failed"),
                                     ("corrupted", b"Unexpected dm-verity status 'C'"),
                                     ("incompatible", b"Compatible mismatch")):
                     result = install(console, name, allowed=(1,))
                     assert error.lower() in result.lower(), f"{name} apresentou erro inesperado"
-                    assert grub_state(console) == initial_state, f"{name} alterou o estado de boot"
-                    assert slot_hash(console, "b") == b_hash, f"{name} alterou o slot inativo"
+                    assert boot_state(console) == initial_state, f"{name} alterou o estado de boot"
+                    assert slot_hash(disk, "b") == b_hash, f"{name} alterou o slot inativo"
             install(console, outcome)
-            assert slot_hash(console, "a") == a_hash, "slot ativo alterado"
-            assert grub_state(console)[b"ORDER"] == b"B A"
+            assert slot_hash(disk, "a") == a_hash, "slot ativo alterado"
+            assert boot_state(console)[b"PRIMARY"] == b"B"
 
     if outcome == "interrupted":
         with root("02-restart-a") as console:
             slot(console, "A")
             confirm(console, "A")
             guest(console, f"grep -Fx persistiu {DOCUMENT}")
-            assert slot_hash(console, "a") == a_hash, "slot ativo alterado"
-            assert slot_hash(console, "b") != b_hash, "slot inativo sem a escrita parcial esperada"
-            assert grub_state(console)[b"ORDER"] == b"A B"
+            assert slot_hash(disk, "a") == a_hash, "slot ativo alterado"
+            assert slot_hash(disk, "b") != b_hash, "slot inativo sem a escrita parcial esperada"
+            assert boot_state(console) == {b"PRIMARY": b"A", b"A": b"good", b"B": b"bad"}
             guest(console, "mkdir -p /run/seed && mount -t ext4 -o ro /dev/vdb /run/seed")
             install(console, "healthy")
         with root("03-retry-b") as console:
@@ -253,19 +268,19 @@ def scenario(args, work, seed, code, firmware_vars, password, outcome, timeout, 
         if outcome == "healthy":
             confirm(console, "B")
         else:
-            guest(console, f"for attempt in 1 2 3 4 5; do test -f {GRUBENV} && exit 0; "
-                  "sleep 1; done; exit 1")
-        state = grub_state(console)
-        assert state[b"B_TRY"] == (b"0" if outcome == "healthy" else b"1"), state
+            guest(console, f"test -x {BOOT_BACKEND}")
+        assert boot_state(console)[b"PRIMARY"] == (b"B" if outcome == "healthy" else b"A")
 
     with root("03-next-boot") as console:
         slot(console, "B" if outcome == "healthy" else "A")
         guest(console, f"grep -Fx persistiu {DOCUMENT}")
         if outcome == "unhealthy":
-            assert grub_state(console)[b"B_TRY"] == b"1"
+            assert boot_state(console)[b"PRIMARY"] == b"A"
     if outcome == "healthy":
         with root("04-manual-a", select_a=True) as console:
             slot(console, "A")
+            confirm(console, "A")
+            assert boot_state(console)[b"PRIMARY"] == b"A"
             guest(console, f"grep -Fx persistiu {DOCUMENT}")
 
 

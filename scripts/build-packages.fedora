@@ -19,6 +19,7 @@ gcc
 gcc-c++
 git
 gzip
+libatomic
 m4
 make
 mtools

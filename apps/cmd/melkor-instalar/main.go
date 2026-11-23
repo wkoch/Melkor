@@ -144,9 +144,21 @@ func install(ctx context.Context, in *bufio.Reader, out io.Writer) error {
 	fmt.Fprintln(out, "Preparando o sistema e verificando os arquivos de instalação.")
 	_, err = pcdisk.Install(ctx, selected, pcdisk.ImageInput{
 		Core: "/melkor/rootfs.squashfs", CoreSHA256: strings.TrimSpace(string(sha)),
-		EFI: "/melkor/bootx64.efi", GRUB: "/melkor/grub-pc.cfg", Credentials: file.Name(),
+		EFI: "/melkor/bootx64.efi", Credentials: file.Name(),
 	}, "/run")
 	return err
+}
+
+func waitForInstallCommand(in *bufio.Reader, out io.Writer) error {
+	for {
+		answer, err := line(in, out, "Digite instalar core para iniciar: ")
+		if err != nil {
+			return err
+		}
+		if answer == "instalar core" {
+			return nil
+		}
+	}
 }
 
 func main() {
@@ -160,6 +172,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	input := bufio.NewReader(os.Stdin)
+	if err := waitForInstallCommand(input, os.Stdout); err != nil {
+		return
+	}
 	if err := install(ctx, input, os.Stdout); err != nil {
 		fmt.Fprintf(os.Stderr, "\nInstalação encerrada: %v\n", err)
 	} else {

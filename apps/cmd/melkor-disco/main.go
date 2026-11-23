@@ -20,15 +20,14 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	flags.StringVar(&input.Destination, "saida", "", "novo arquivo de disco virtual")
 	flags.StringVar(&input.Core, "core", "", "arquivo SquashFS dos slots")
 	flags.StringVar(&input.CoreSHA256, "sha256", "", "SHA-256 esperado do core")
-	flags.StringVar(&input.EFI, "efi", "", "executável GRUB bootx64.efi")
-	flags.StringVar(&input.GRUB, "grub", "", "modelo de grub.cfg da geração")
+	flags.StringVar(&input.EFI, "efi", "", "executável Limine BOOTX64.EFI")
 	flags.StringVar(&input.Credentials, "credenciais", "", "arquivo 0600 com hashes locais root e melkor")
 	size := flags.Uint64("gib", 16, "capacidade do disco virtual em GiB")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || input.Destination == "" || input.Core == "" || input.EFI == "" || input.GRUB == "" || input.CoreSHA256 == "" {
-		return fmt.Errorf("informe -saida, -core, -sha256, -efi e -grub")
+	if flags.NArg() != 0 || input.Destination == "" || input.Core == "" || input.EFI == "" || input.CoreSHA256 == "" {
+		return fmt.Errorf("informe -saida, -core, -sha256, -efi")
 	}
 	if *size > (1<<63-1)/pcdisk.GiB {
 		return fmt.Errorf("capacidade do disco fora do limite")

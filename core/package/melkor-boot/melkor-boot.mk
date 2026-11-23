@@ -1,0 +1,8 @@
+MELKOR_BOOT_VERSION = 1.0
+MELKOR_BOOT_SITE = $(BR2_EXTERNAL_MELKOR_PATH)/../apps
+MELKOR_BOOT_SITE_METHOD = local
+MELKOR_BOOT_GOMOD = melkor.local/apps
+MELKOR_BOOT_BUILD_TARGETS = ./cmd/melkor-boot
+MELKOR_BOOT_GO_ENV = CGO_ENABLED=0
+
+$(eval $(golang-package))

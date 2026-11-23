@@ -21,7 +21,7 @@ class ChannelPCTest(unittest.TestCase):
             original.write_bytes(b"bundle")
             key = build / "channel.key"
             anchor = build / "rauc.pem"
-            manifest = "[update]\ncompatible=melkor-pc-x86_64\n"
+            manifest = "[update]\ncompatible=melkor-pc-limine-x86_64\n"
             graphical = True
 
             def extract(args, **_):
@@ -46,7 +46,7 @@ class ChannelPCTest(unittest.TestCase):
                  patch.object(subprocess, "check_output", side_effect=command):
                 envelope = json.loads(sign(build, original, anchor, key, "https://example.invalid/update.raucb", 1))
                 actual = json.loads(b64decode(envelope["payload"]))
-                self.assertEqual(actual["target"], "melkor-pc-x86_64")
+                self.assertEqual(actual["target"], "melkor-pc-limine-x86_64")
                 self.assertEqual(actual["sha256"], "1e6ed65d77d6364eeaed5a745ba5c4985ae2b700dd85d7cf7f027bdf294a33fc")
                 self.assertEqual(len(b64decode(envelope["signature"])), 64)
                 self.assertNotIn("profile", actual)

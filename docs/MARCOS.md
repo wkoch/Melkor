@@ -292,3 +292,47 @@ O executor `tests/installer_vm.py --desktop-bundle … --memory-mib 8192` instal
 ### Preparação do canal HTTPS do desktop
 
 `melkor-finalizar` ganhou um canal exclusivo com manifesto assinado. O teste TLS local confirmou o download do bundle pelo SHA-256 e a recusa de manifestos trocados entre a base e o desktop. `make test` passou com 81,0% em Go, 92,1% em Python e 97,7% em Shell. O diretório `publicacao` ficou configurado para o Netlify. A ativação depende do domínio, da publicação do bundle desktop e de uma imagem que inclua o cliente atualizado.
+
+### Comandos operacionais do PC
+
+A ISO de laboratório recomposta usa `instalar core` antes da seleção numérica. O Buildroot executou `melkor-storage-rebuild` no contêiner Fedora 45 e colocou o CLI de aplicativos no destino PC. `scripts/installer-iso.py` montou a mídia a partir do kernel e do initramfs de laboratório, com os binários e os arquivos novos, GRUB, xorriso, cpio, mkfs.vfat e Mtools do ambiente de build.
+
+`QEMU_ACCEL=tcg python3 tests/installer_vm.py ISO --log-dir DIRETÓRIO` com QEMU e OVMF confirmou o cancelamento, a integridade do NVMe vizinho e os boots pelos dois slots. Sem rede na VM, `instalar pacote noctalia` e `atualizar` pediram a senha de root e tentaram abrir, respectivamente, os canais HTTPS do desktop e do core. `atualizar` criou o perfil com a propriedade da conta comum mesmo com a rede indisponível. A cobertura de `make test` foi de 80,9% em Go, 92,1% em Python e 97,7% em Shell. A disponibilização dos navegadores como aplicativos independentes e a publicação de uma geração assinada com os novos comandos continuam pendentes.
+
+### Mold no build do PC
+
+O Buildroot executou `host-melkor-mold`, `dinit-reconfigure` e um novo build de `melkor-dhcpcd` depois de `melkor-dhcpcd-dirclean`. O `readelf` identificou Mold 2.39.1 em dinit, dinitctl, shutdown e dhcpcd. O contêiner de build usa glibc e libatomic para executar o linker.
+
+O core mínimo de laboratório recebeu esses quatro binários. `make pc-disk` e `make test-pc-disk` usaram a toolchain, Mtools, QEMU e OVMF do ambiente de build. Os dois slots iniciaram e a conta de teste reabriu no slot B o documento escrito no A. `make test-dns BOARD=pc` verificou DHCP e Quad9 DoH na rede virtual. O kernel e as imagens de boot foram reaproveitados de um build anterior.
+
+`make pc-session-layer PC_SESSION_LAYER=out/pc-noctalia-mold-session.tar.gz` compilou a sessão com Podman rootless, Meson e o SDK Alpine fixado. O `readelf` confirmou Mold 2.39.1 em Umbriel, Noctalia Shell, Greeter e Luciole. Uma imagem de laboratório recomposta combinou esses binários com dinit e dhcpcd relinkados. `make test-pc-desktop PC_DESKTOP_LOGIN=1 PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_AUDIO=1` verificou login, os aplicativos, o retorno ao Greeter e áudio em QEMU com OVMF. `make check-env BOARD=pc` confirmou as fontes no cache e `make test` passou com 80,9% em Go, 92,1% em Python e 97,7% em Shell.
+
+### Limine nas mídias UEFI
+
+A migração das mídias usa Limine 12.9.6. `make image BOARD=live` compilou o kernel e o initramfs atuais. No contêiner Fedora, a montagem da FAT precisou de `GCONV_PATH=/usr/lib64/gconv` para Mtools. O Buildroot retomou o caminho de saída existente com essa variável e concluiu as imagens. `scripts/test-boot.py --live` passou em QEMU com OVMF e TCG pelo CD UEFI e pelo USB virtual. O executor confirmou framebuffer, login em RAM, firmware Wi-Fi, serviço IWD e o NVMe vizinho intacto.
+
+`scripts/installer-iso.py` montou a ISO de laboratório com o cpio do instalador, o SquashFS PC e o GRUB do disco de builds anteriores. `tests/installer_vm.py` passou em QEMU com OVMF pelo CD UEFI e pelo Ventoy 1.1.18 em modo normal com setores de 512 bytes. O CD UEFI também passou com NVMe 4Kn. Os testes exercitaram a confirmação recusada, a integridade do segundo NVMe e os primeiros boots nos dois slots. `make check-env BOARD=live` e `make check-env BOARD=installer` encontraram as fontes no cache. `make test` passou com 80,9% em Go, 92,1% em Python e 97,7% em Shell.
+
+Um disco PC virtual de laboratório iniciou ambos os slots SquashFS pelo Limine com duas cópias do kernel na ESP. Um ensaio separado com as mesmas variáveis OVMF iniciou A, agendou B via `LoaderEntryOneShot` e retornou a A após o boot único de B. Depois de uma nova tentativa em B, a promoção explícita via `LoaderEntryDefault` fez o boot seguinte continuar em B. Nessa etapa, o disco do instalador ainda usava GRUB.
+
+### Sondagem de LTO
+
+Em builds de laboratório com GCC 14.4.0 e Mold 2.39.1, `-flto=auto` em compilação e linkedição reduziu o binário dinit de 425.728 para 351.008 bytes e dhcpcd de 386.280 para 374.776 bytes, depois de retirar os símbolos de depuração. `make test-dns BOARD=pc` passou com o dhcpcd recompilado. `QEMU_ACCEL=tcg make test-pc-disk` verificou o boot e os dados nos dois slots de uma imagem com dinit e dhcpcd recompilados. O ensaio mediu o tamanho dos binários.
+
+### Limine no disco instalado e LTO nas receitas
+
+`make check-env BOARD=…` verificou o cache e as ferramentas do Fedora 45 para M0, M1, PC e instalador. O build limpo `make image BOARD=pc` gerou o core mínimo, o kernel da toolchain Buildroot (GCC 14.4.0 e binutils 2.43.1) e o Limine 12.9.6. `sha256sum -c ../../SHA256SUMS` aprovou os três artefatos. O manifesto do core inclui BusyBox 1.37.0 e a configuração mantém o ash.
+
+`make pc-disk` provisionou as credenciais descartáveis e `make test-pc-disk` confirmou por UEFI os dois slots, as credenciais e os dados persistentes. Antes do build limpo, uma ISO de laboratório recomposta precedeu a validação pelo CD UEFI e pelo Ventoy 1.1.18 em modo normal. Os dois testes de instalação verificaram a recusa de uma confirmação incorreta, a preservação do NVMe vizinho e a inicialização dos dois slots.
+
+`make test-update BOARD=pc` com o core do build limpo, certificado de laboratório e QEMU com OVMF e TCG validou a rejeição de bundles, a promoção A → B e o retorno automático B → A com candidata sem confirmação. Também validou uma interrupção de escrita seguida de nova instalação e a confirmação de A após uma seleção manual. O último caso exercitou a escrita de uma variável UEFI existente sob proteção de imutabilidade. `make test-update-https` recusou certificado TLS desconhecido, SHA-256 divergente e assinatura RAUC inválida preservando o slot inativo. O bundle válido iniciou B com os dados gravados em A.
+
+`make test-installer` passou com uma ISO contendo o core limpo e as chaves públicas oficiais, montada com o initramfs recomposto do instalador. O laboratório validou CD UEFI com NVMe de 512 bytes e 4Kn, além do Ventoy 1.1.18 em modo normal. `make test` passou com 80,7% em Go, 91,8% em Python e 97,7% em Shell. A disponibilidade do novo canal Limine depende da publicação dos manifestos e bundles assinados.
+
+`make test-dns BOARD=pc` rodou em KVM com OVMF, Ethernet virtual e acesso ao Quad9 em IPv4. O resolvedor respondeu por DoH e a perda de acesso ao servidor falhou sem gerar tráfego DNS em texto claro.
+
+`make pc-session-layer` montou a camada com os quatro projetos da estação. No SDK Alpine 3.24, Umbriel e Noctalia Greeter passaram com LTO. Noctalia Shell e Luciole falharam na linkedição de `vsnprintf` com LTO e preservaram a fortificação do SDK com LTO desativado. `make bundle-pc` assinou o bundle de laboratório. `make test-installer PC_DESKTOP_BUNDLE=…` validou a instalação em dois estágios e o login gráfico após aplicar esse bundle. `make test-pc-desktop PC_DESKTOP_APPS=1 PC_DESKTOP_CHROMIUM=1 PC_DESKTOP_UMBRIEL=1 PC_DESKTOP_AUDIO=1 PC_DESKTOP_LOGIN=1` passou com KVM. O teste verificou os três navegadores, Alacritty com Nushell, Luciole, o retorno ao greeter e a reprodução de áudio com HDA virtual.
+
+Os builds limpos de M0 e M1 geraram imagens com Limine. `make test-boot BOARD=m0` confirmou login serial, dinit como PID 1 e raiz somente para leitura. `make check-m1` conferiu a GPT, a ESP, a correspondência dos kernels e as configurações dos slots. `make test-boot BOARD=m1` iniciou A e B por UEFI e reencontrou em B o documento criado em A. `make test-update BOARD=m1` passou em KVM após provisionar credenciais de laboratório. O executor verificou assinatura, rejeição, promoção, retorno e interrupção da escrita.
+
+O build limpo `make image BOARD=installer` gerou o kernel e o initramfs. `scripts/installer-iso.py` montou a ISO com o core de revisão 1 e as chaves públicas oficiais. Em QEMU com OVMF e TCG, `make test-installer` e a variante Ventoy em modo normal confirmaram o boot da ISO final, a preservação do NVMe vizinho e o primeiro boot nos dois slots. A tentativa do mesmo CD com KVM expirou antes do menu do Limine. O hardware do HP ainda precisa de verificação.

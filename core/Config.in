@@ -5,6 +5,9 @@ source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-storage/Config.in"
 source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-installer/Config.in"
 source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-nushell/Config.in"
 
+config BR2_PACKAGE_HOST_MELKOR_LIMINE
+	bool "Limine x86-64 UEFI media image"
+
 config BR2_MELKOR_LIVE_BUILTIN_FIRMWARE
 	bool "Embed firmware for the Intel AX200 in the Live kernel"
 	depends on BR2_LINUX_KERNEL
@@ -13,3 +16,5 @@ config BR2_MELKOR_LIVE_BUILTIN_FIRMWARE
 	help
 	  Use the verified firmware packages to make the AX200 firmware
 	  and the signed regulatory database available for early probing.
+
+source "$BR2_EXTERNAL_MELKOR_PATH/package/melkor-boot/Config.in"
