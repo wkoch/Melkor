@@ -17,6 +17,10 @@ Estas instruções abrangem o repositório inteiro. Use português do Brasil par
 - Fixe a versão dos componentes no primeiro build validado. Registre desvios temporários de bootstrap e o trabalho necessário para chegar à configuração pretendida.
 - Priorize os riscos vindos da rede. Cubra com testes a validação de fontes e assinaturas, a rejeição de artefatos e a preservação da geração ativa quando uma atualização falha.
 
+## Compatibilidade das releases
+
+Regra definitiva do projeto: novas releases não podem quebrar versões anteriores que o usuário esteja usando. Uma quebra só entra com a concordância explícita do mantenedor, e nesse caso a versão indica a incompatibilidade pelo SemVer, com o incremento de versão maior. Antes de publicar, confirme que uma instalação da versão anterior continua recebendo a atualização pelo canal sem intervenção manual. Se a migração exigir reinstalação, pare e pergunte ao mantenedor antes de publicar. [Arquitetura](docs/ARQUITETURA.md#compatibilidade-das-releases)
+
 ## Para concluir
 
 Execute os casos pertinentes de [TESTES.md](docs/TESTES.md). Informe o comando, o resultado observado e as limitações reais do ambiente. Um build concluído, um boot até o login e uma recuperação automática são resultados distintos. Atualize o README quando houver um novo comando operacional e o documento de marcos quando seus critérios tiverem sido demonstrados.
