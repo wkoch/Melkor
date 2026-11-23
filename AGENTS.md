@@ -19,7 +19,7 @@ Estas instruções abrangem o repositório inteiro. Use português do Brasil par
 
 ## Compatibilidade das releases
 
-Regra definitiva do projeto: novas releases não podem quebrar versões anteriores que o usuário esteja usando. Uma quebra só entra com a concordância explícita do mantenedor, e nesse caso a versão indica a incompatibilidade pelo SemVer, com o incremento de versão maior. Antes de publicar, confirme que uma instalação da versão anterior continua recebendo a atualização pelo canal sem intervenção manual. Se a migração exigir reinstalação, pare e pergunte ao mantenedor antes de publicar. [Arquitetura](docs/ARQUITETURA.md#compatibilidade-das-releases)
+Regra definitiva do projeto: versões finais (`1.0`, `1.1`, `1.1.1` e assim por diante) não podem quebrar versões anteriores que o usuário esteja usando. Uma quebra nessas versões só entra com a concordância explícita do mantenedor, e nesse caso a versão indica a incompatibilidade pelo SemVer, com o incremento de versão maior. Versões alpha e beta (`0.1.0-alpha.N`, `-beta.N`) ficam fora dessa regra e podem quebrar instalações de teste. Antes de publicar uma versão final, confirme que uma instalação da versão anterior continua recebendo a atualização pelo canal sem intervenção manual. Se a migração exigir reinstalação, pare e pergunte ao mantenedor antes de publicar. [Arquitetura](docs/ARQUITETURA.md#compatibilidade-das-releases)
 
 ## Para concluir
 

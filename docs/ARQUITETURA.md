@@ -90,7 +90,7 @@ O kernel Live habilita interrupções PCI MSI e incorpora `iwlwifi-cc-a0-77.ucod
 
 ## Compatibilidade das releases
 
-Regra definitiva do projeto: uma release nova não pode quebrar as versões anteriores que o usuário esteja usando. Uma quebra só entra com a concordância explícita do mantenedor, e nesse caso a versão precisa indicar a incompatibilidade pelo SemVer, com o incremento de versão maior. Essa regra vale para o canal de atualização, o instalador, o formato dos bundles, o layout de boot e os comandos operacionais. [Instruções de trabalho](../AGENTS.md#compatibilidade-das-releases)
+Regra definitiva do projeto: versões finais (`1.0`, `1.1`, `1.1.1` e assim por diante) não podem quebrar as versões anteriores que o usuário esteja usando. Uma quebra nessas versões só entra com a concordância explícita do mantenedor, e nesse caso a versão precisa indicar a incompatibilidade pelo SemVer, com o incremento de versão maior. Versões alpha e beta (`0.1.0-alpha.N`, `-beta.N`) ficam fora dessa regra e podem quebrar instalações de teste. Essa regra vale para o canal de atualização, o instalador, o formato dos bundles, o layout de boot e os comandos operacionais. [Instruções de trabalho](../AGENTS.md#compatibilidade-das-releases)
 
 Ao preparar uma release, verifique se uma instalação da versão anterior ainda recebe a atualização pelo canal sem intervenção manual. Se a migração exigir reinstalação, registre isso como quebra e aguarde a concordância antes de publicar.
 
