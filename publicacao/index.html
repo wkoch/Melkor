@@ -20,7 +20,7 @@
         O core do Melkor.<br>
         Sua voz molda o sistema.</p>
       <nav aria-label="Links do projeto">
-        <a class="download" href="https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.5-desktop">Baixar Core</a>
+        <a class="download" id="baixar-core" href="https://github.com/wkoch/Melkor/releases/tag/pc-v0.1.0-alpha.6-desktop">Baixar Core</a>
         <a href="https://github.com/wkoch/Melkor/blob/main/docs/INSTALACAO.md">Guia de instalação</a>
         <a href="https://github.com/wkoch/Melkor">Código no GitHub</a>
       </nav>
@@ -34,5 +34,28 @@
     </div>
     <p class="status" role="status"></p>
   </main>
+  <script>
+    // Aponta "Baixar Core" para a release pc-v* mais recente publicada no GitHub.
+    // Releases em pré-lançamento entram na conta; /releases/latest não serve aqui,
+    // porque ignora pré-lançamentos. Sem JavaScript ou sem rede, fica o link de fallback acima.
+    (function () {
+      var link = document.getElementById("baixar-core");
+      if (!link || !window.fetch) return;
+      fetch("https://api.github.com/repos/wkoch/Melkor/releases?per_page=30", {
+        headers: { Accept: "application/vnd.github+json" }
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error("GitHub respondeu " + response.status);
+          return response.json();
+        })
+        .then(function (releases) {
+          var newest = releases
+            .filter(function (release) { return !release.draft && /^pc-v/.test(release.tag_name); })
+            .sort(function (a, b) { return new Date(b.published_at) - new Date(a.published_at); })[0];
+          if (newest && newest.html_url) link.href = newest.html_url;
+        })
+        .catch(function () { /* mantém o link de fallback */ });
+    })();
+  </script>
 </body>
 </html>
