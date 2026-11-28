@@ -70,12 +70,12 @@ func TestSelecionaSomenteDiscoConfirmadoPeloNumero(t *testing.T) {
 func TestLeituraDeSenhaRejeitaEntradaIncompletaOuDivergente(t *testing.T) {
 	for _, input := range []string{"fraca\nfraca\n", "senha-de-teste\ndiferente\n", "", "senha-de-teste\n",
 		"senha-de-\tteste\nsenha-de-\tteste\n", strings.Repeat("a", 129) + "\n" + strings.Repeat("a", 129) + "\n"} {
-		if _, err := readPassword(bufio.NewReader(strings.NewReader(input)), io.Discard, "root"); err == nil {
+		if _, err := readPassword(bufio.NewReader(strings.NewReader(input)), io.Discard, "root", ""); err == nil {
 			t.Fatalf("aceitou entrada inválida")
 		}
 	}
 	var output bytes.Buffer
-	password, err := readPassword(bufio.NewReader(strings.NewReader("senha-de-teste\nsenha-de-teste\n")), &output, "root")
+	password, err := readPassword(bufio.NewReader(strings.NewReader("senha-de-teste\nsenha-de-teste\n")), &output, "root", "")
 	if err != nil || password != "senha-de-teste" || strings.Contains(output.String(), password) {
 		t.Fatal("leitura falhou ou exibiu a senha")
 	}
@@ -110,5 +110,38 @@ func TestProvisaoExigeSenhasDistintasEUsaApenasOsHashes(t *testing.T) {
 		if _, err := collectCredentials(bufio.NewReader(strings.NewReader(invalid)), io.Discard, digest); err == nil {
 			t.Fatal("credenciais incompletas ou repetidas foram aceitas")
 		}
+	}
+}
+
+func TestLeituraDeSenhaRepeteComMotivoSemAbortarInstalacao(t *testing.T) {
+	root := "senha-de-root-escolhida"
+	for _, test := range []struct {
+		name, input, forbidden, message string
+	}{
+		{"curta", "curta\ncurta\n" + root + "\n" + root + "\n", "", "precisa ter de 12 a 128 bytes"},
+		{"divergente", "senha-de-teste\noutra-senha-x\n" + root + "\n" + root + "\n", "", "não conferem"},
+		{"igual ao root", root + "\n" + root + "\n" + root + "\n" + root + "\n" + "conta-comum-x\nconta-comum-x\n", root, "diferente da de root"},
+		{"enter extra", "\n" + "\n" + root + "\n" + root + "\n", "", "precisa ter de 12 a 128 bytes"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			password, err := readPassword(bufio.NewReader(strings.NewReader(test.input)), &output, "melkor", test.forbidden)
+			if err != nil {
+				t.Fatalf("a repetição deveria obter uma senha válida: %v", err)
+			}
+			if password != root && password != "conta-comum-x" {
+				t.Fatalf("senha inesperada")
+			}
+			if !strings.Contains(output.String(), test.message) {
+				t.Fatalf("mensagem ausente %q na saída %q", test.message, output.String())
+			}
+			if strings.Contains(output.String(), root) || strings.Contains(output.String(), "conta-comum-x") {
+				t.Fatal("a repetição exibiu a senha")
+			}
+		})
+	}
+	var output bytes.Buffer
+	if _, err := readPassword(bufio.NewReader(strings.NewReader("curta\ncurta\n")), &output, "root", ""); err == nil {
+		t.Fatal("entrada sem senha válida deveria terminar com erro ao chegar ao fim")
 	}
 }

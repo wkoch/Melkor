@@ -50,21 +50,51 @@ func selectDisk(in *bufio.Reader, out io.Writer, disks []pcdisk.Disk) (pcdisk.Di
 	return disk, nil
 }
 
-func readPassword(in *bufio.Reader, out io.Writer, account string) (string, error) {
-	password, err := line(in, out, "Senha de "+account+" (12 a 128 bytes): ")
-	fmt.Fprintln(out)
-	if err != nil {
-		return "", err
+const (
+	minPasswordBytes = 12
+	maxPasswordBytes = 128
+)
+
+// passwordProblem explica por que a senha não pode ser usada, ou devolve vazio quando ela é aceita.
+func passwordProblem(password string) string {
+	switch {
+	case len(password) < minPasswordBytes || len(password) > maxPasswordBytes:
+		return fmt.Sprintf("a senha precisa ter de %d a %d bytes", minPasswordBytes, maxPasswordBytes)
+	case strings.IndexFunc(password, unicode.IsControl) >= 0:
+		return "a senha não pode conter caracteres de controle"
 	}
-	confirmation, err := line(in, out, "Repita a senha de "+account+": ")
-	fmt.Fprintln(out)
-	if err != nil {
-		return "", err
+	return ""
+}
+
+// readPassword repete o par de perguntas até obter uma senha válida. Um erro de digitação
+// não encerra a instalação: o instalador mostra o motivo e pede a senha de novo.
+// Somente o fim da entrada devolve erro.
+func readPassword(in *bufio.Reader, out io.Writer, account, forbidden string) (string, error) {
+	for {
+		password, err := line(in, out, "Senha de "+account+" (12 a 128 bytes): ")
+		fmt.Fprintln(out)
+		if err != nil {
+			return "", err
+		}
+		confirmation, err := line(in, out, "Repita a senha de "+account+": ")
+		fmt.Fprintln(out)
+		if err != nil {
+			return "", err
+		}
+		if problem := passwordProblem(password); problem != "" {
+			fmt.Fprintf(out, "Senha recusada para %s: %s. Digite as duas vezes de novo.\n", account, problem)
+			continue
+		}
+		if password != confirmation {
+			fmt.Fprintf(out, "As senhas de %s não conferem. Digite as duas vezes de novo.\n", account)
+			continue
+		}
+		if forbidden != "" && password == forbidden {
+			fmt.Fprintf(out, "Use uma senha diferente da de root para %s.\n", account)
+			continue
+		}
+		return password, nil
 	}
-	if len(password) < 12 || len(password) > 128 || strings.IndexFunc(password, unicode.IsControl) >= 0 || password != confirmation {
-		return "", fmt.Errorf("senha inválida ou confirmação divergente para %s", account)
-	}
-	return password, nil
 }
 
 func credentials(ctx context.Context, in *bufio.Reader, terminal *os.File, out io.Writer) (string, error) {
@@ -90,16 +120,13 @@ func credentials(ctx context.Context, in *bufio.Reader, terminal *os.File, out i
 }
 
 func collectCredentials(in *bufio.Reader, out io.Writer, hash func(string) (string, error)) (string, error) {
-	root, err := readPassword(in, out, "root")
+	root, err := readPassword(in, out, "root", "")
 	if err != nil {
 		return "", err
 	}
-	user, err := readPassword(in, out, "melkor")
+	user, err := readPassword(in, out, "melkor", root)
 	if err != nil {
 		return "", err
-	}
-	if root == user {
-		return "", fmt.Errorf("use senhas distintas para root e melkor")
 	}
 	var hashes strings.Builder
 	for _, account := range []struct{ name, password string }{{"root", root}, {"melkor", user}} {
